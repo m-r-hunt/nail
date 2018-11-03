@@ -1,0 +1,18 @@
+[package]
+name = "notlox"
+version = "0.1.0"
+authors = ["Max Hunt <max@huntw3.com>"]
+autobins = false
+
+[dependencies]
+
+[lib]
+name = "notlox"
+path = "src/lib.rs"
+
+[[bin]]
+name = "notloxc"
+path = "src/main.rs"
+
+[features]
+debugTraceExecution = []
