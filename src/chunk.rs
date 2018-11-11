@@ -1,21 +1,50 @@
 use super::value::Value;
 
 #[derive(Copy, Clone)]
+#[repr(u8)]
 pub enum OpCode {
     Return = 1,
+
     Constant = 2,
+
+    Negate = 3,
+
+    Add = 4,
+    Subtract = 5,
+    Multiply = 6,
+    Divide = 7,
+
+    Print = 8,
+
+    AssignLocal = 9,
+    LoadLocal = 10,
 }
 
 impl OpCode {
-    pub fn from(val: u8) -> Option<Self> {
+    pub fn try_from(val: u8) -> Option<Self> {
         match val {
             1 => Some(OpCode::Return),
+
             2 => Some(OpCode::Constant),
-            _ => None
+
+            3 => Some(OpCode::Negate),
+
+            4 => Some(OpCode::Add),
+            5 => Some(OpCode::Subtract),
+            6 => Some(OpCode::Multiply),
+            7 => Some(OpCode::Divide),
+
+            8 => Some(OpCode::Print),
+
+            9 => Some(OpCode::AssignLocal),
+            10 => Some(OpCode::LoadLocal),
+
+            _ => None,
         }
     }
 }
 
+#[derive(Default)]
 pub struct Chunk {
     pub code: Vec<u8>,
     pub lines: Vec<usize>,
@@ -24,9 +53,9 @@ pub struct Chunk {
 
 impl Chunk {
     pub fn new() -> Chunk {
-        Chunk{code: Vec::new(), lines: Vec::new(), constants: Vec::new()}
+        Chunk::default()
     }
-    
+
     pub fn write_chunk(&mut self, byte: u8, line: usize) {
         self.code.push(byte);
         self.lines.push(line);
@@ -34,6 +63,6 @@ impl Chunk {
 
     pub fn add_constant(&mut self, value: Value) -> u8 {
         self.constants.push(value);
-        return (self.constants.len() - 1) as u8
+        return (self.constants.len() - 1) as u8;
     }
 }

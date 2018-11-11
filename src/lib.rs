@@ -1,15 +1,50 @@
-mod chunk;
-mod debug;
+pub mod chunk;
+mod compiler;
+pub mod debug;
+mod errors;
+mod parser;
+pub mod scanner;
 mod value;
-mod vm;
+pub mod vm;
 
-pub fn main() {
+use std::io::Write;
+
+pub fn repl() {
     let mut vm = vm::VM::new();
-    let mut chunk = chunk::Chunk::new();
-    let constant = chunk.add_constant(value::Value(1.2));
-    chunk.write_chunk(chunk::OpCode::Constant as u8, 123);
-    chunk.write_chunk(constant, 123);
-    chunk.write_chunk(chunk::OpCode::Return as u8, 123);
-    debug::disassemble_chunk(&chunk, "test chunk");
-    vm.interpret(chunk);
+    loop {
+        print!("> ");
+        std::io::stdout().flush().unwrap();
+
+        let mut line = String::new();
+
+        let result = std::io::stdin().read_line(&mut line);
+        match result {
+            Ok(_) => {}
+            Err(e) => {
+                println!("{}", e);
+                break;
+            }
+        }
+
+        let result = vm.interpret(&line);
+        match result {
+            Ok(_) => {}
+            Err(e) => {
+                println!("{}", e);
+            }
+        }
+    }
+}
+
+pub fn run_file(filename: &str) {
+    let result = std::fs::read_to_string(filename);
+    let code = result.expect(&format!("Unable to read file {}", filename));
+
+    let mut vm = vm::VM::new();
+    let result = vm.interpret(&code);
+    match result {
+        Ok(_) => {}
+        Err(vm::InterpreterError::CompileError(_)) => return,
+        Err(vm::InterpreterError::RuntimeError) => return,
+    }
 }
