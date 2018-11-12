@@ -18,6 +18,9 @@ pub enum OpCode {
 
     AssignLocal = 9,
     LoadLocal = 10,
+
+    PushNil = 11,
+    Pop = 12,
 }
 
 impl OpCode {
@@ -38,6 +41,9 @@ impl OpCode {
 
             9 => Some(OpCode::AssignLocal),
             10 => Some(OpCode::LoadLocal),
+
+            11 => Some(OpCode::PushNil),
+            12 => Some(OpCode::Pop),
 
             _ => None,
         }

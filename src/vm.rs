@@ -36,9 +36,19 @@ impl std::error::Error for InterpreterError {}
 macro_rules! binary_op {
     ( $self:expr, $op:tt ) => {
         {
-            let b = $self.pop().0;
-            let a = $self.pop().0;
-            $self.push(value::Value(a $op b))
+            let mut b: f64;
+            if let value::Value::Number(bval) = $self.pop() {
+                b = bval;
+            } else {
+                return Err(InterpreterError::RuntimeError);
+            }
+            let mut a: f64;
+            if let value::Value::Number(aval) = $self.pop() {
+                a = aval;
+            } else {
+                return Err(InterpreterError::RuntimeError);
+            }
+            $self.push(value::Value::Number(a $op b))
         }
     }
 }
@@ -48,9 +58,9 @@ impl VM {
         VM {
             chunk: chunk::Chunk::new(),
             ip: 0,
-            stack: [value::Value(0.0); STACK_SIZE],
+            stack: [value::Value::Nil; STACK_SIZE],
             stack_top: 0,
-            locals: [value::Value(0.0); 256],
+            locals: [value::Value::Nil; 256],
         }
     }
 
@@ -83,8 +93,11 @@ impl VM {
                 }
 
                 Some(chunk::OpCode::Negate) => {
-                    let value = self.pop().0;
-                    self.push(value::Value(-value));
+                    if let value::Value::Number(value) = self.pop() {
+                        self.push(value::Value::Number(-value));
+                    } else {
+                        return Err(InterpreterError::RuntimeError);
+                    }
                 }
 
                 Some(chunk::OpCode::Add) => binary_op!(self, +),
@@ -102,6 +115,13 @@ impl VM {
                     let number = self.read_byte();
                     let value = self.locals[number as usize];
                     self.push(value);
+                }
+
+                Some(chunk::OpCode::PushNil) => {
+                    self.push(value::Value::Nil);
+                }
+                Some(chunk::OpCode::Pop) => {
+                    self.pop();
                 }
 
                 None => return Err(InterpreterError::RuntimeError),

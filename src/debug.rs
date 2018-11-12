@@ -35,6 +35,9 @@ pub fn disassemble_instruction(chunk: &Chunk, offset: usize) -> usize {
         Some(OpCode::AssignLocal) => number_instruction("OP_ASSIGN_LOCAL", &chunk, offset),
         Some(OpCode::LoadLocal) => number_instruction("OP_LOAD_LOCAL", &chunk, offset),
 
+        Some(OpCode::PushNil) => simple_instruction("OP_PUSH_NIL", offset),
+        Some(OpCode::Pop) => simple_instruction("OP_POP", offset),
+
         None => {
             println!("Unknown opcode {}", instr);
             offset + 1

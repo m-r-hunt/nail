@@ -57,6 +57,7 @@ impl Compiler {
 
     fn compile_expression_statement(&mut self, statement: parser::ExpressionStatement) {
         self.compile_expression(statement.expression);
+        self.chunk.write_chunk(OpCode::Pop as u8, 1);
     }
 
     fn compile_expression(&mut self, expression: parser::Expression) {
@@ -73,7 +74,7 @@ impl Compiler {
     fn compile_literal(&mut self, literal: parser::Literal) {
         match literal {
             parser::Literal::Number(n) => {
-                let c = self.chunk.add_constant(value::Value(n));
+                let c = self.chunk.add_constant(value::Value::Number(n));
                 self.chunk.write_chunk(OpCode::Constant as u8, 1);
                 self.chunk.write_chunk(c, 1);
             }
@@ -115,8 +116,9 @@ impl Compiler {
         for s in block.statements {
             self.compile_statement(s);
         }
-        block.expression.map(|e| {
-            self.compile_expression(*e);
-        });
+        match block.expression {
+            Some(e) => self.compile_expression(*e),
+            None => self.chunk.write_chunk(OpCode::PushNil as u8, 1),
+        }
     }
 }
