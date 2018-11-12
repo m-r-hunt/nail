@@ -41,12 +41,19 @@ pub struct Variable {
 }
 
 #[derive(Debug)]
+pub struct Block {
+    pub statements: Vec<Statement>,
+    pub expression: Option<Box<Expression>>,
+}
+
+#[derive(Debug)]
 pub enum Expression {
     Literal(Literal),
     Unary(Unary),
     Binary(Binary),
     Grouping(Grouping),
     Variable(Variable),
+    Block(Block),
 }
 
 #[derive(Debug)]
@@ -60,26 +67,21 @@ pub struct PrintStatement {
 }
 
 #[derive(Debug)]
-pub enum Statement {
-    ExpressionStatement(ExpressionStatement),
-    PrintStatement(PrintStatement),
-}
-
-#[derive(Debug)]
-pub struct VariableDeclaration {
+pub struct LetStatement {
     pub name: String,
     pub initializer: Option<Expression>,
 }
 
 #[derive(Debug)]
-pub enum Declaration {
-    VariableDeclaration(VariableDeclaration),
-    Statement(Statement),
+pub enum Statement {
+    ExpressionStatement(ExpressionStatement),
+    LetStatement(LetStatement),
+    PrintStatement(PrintStatement),
 }
 
 #[derive(Debug)]
 pub struct Program {
-    pub declarations: Vec<Declaration>,
+    pub statements: Vec<Statement>,
 }
 
 impl Parser {
@@ -93,15 +95,18 @@ impl Parser {
         })
     }
 
-    fn declaration(&mut self) -> Result<Declaration> {
-        if self.matches(&[TokenType::Var])? {
-            return self.variable_declaration();
+    fn statement(&mut self) -> Result<Statement> {
+        if self.matches(&[TokenType::Print])? {
+            return self.print_statement();
         }
-        return Ok(Declaration::Statement(self.statement()?));
-        // Todo: sync
+        if self.matches(&[TokenType::Let])? {
+            return self.let_statement();
+        }
+
+        return self.expression_statement();
     }
 
-    fn variable_declaration(&mut self) -> Result<Declaration> {
+    fn let_statement(&mut self) -> Result<Statement> {
         let name = self.consume(TokenType::Identifier, "Expect variable name.")?;
 
         let mut initializer = None;
@@ -114,18 +119,7 @@ impl Parser {
             "Expect ';' after variable declaration.",
         )?;
         let name = self.scanner.get_lexeme(&name);
-        return Ok(Declaration::VariableDeclaration(VariableDeclaration {
-            name,
-            initializer,
-        }));
-    }
-
-    fn statement(&mut self) -> Result<Statement> {
-        if self.matches(&[TokenType::Print])? {
-            return self.print_statement();
-        }
-
-        return self.expression_statement();
+        return Ok(Statement::LetStatement(LetStatement { name, initializer }));
     }
 
     fn print_statement(&mut self) -> Result<Statement> {
@@ -140,10 +134,49 @@ impl Parser {
         return Ok(Statement::ExpressionStatement(ExpressionStatement {
             expression,
         }));
+
+        // Todo: Add pop.
     }
 
     fn expression(&mut self) -> Result<Expression> {
+        if self.peek().token_type == TokenType::LeftBrace {
+            return self.block();
+        }
         return self.equality();
+    }
+
+    fn block(&mut self) -> Result<Expression> {
+        self.consume(TokenType::LeftBrace, "Expected '{' to start block.")?;
+        let mut statements = Vec::new();
+        let mut expression = None;
+        while self.peek().token_type != TokenType::RightBrace {
+            match self.peek().token_type {
+                TokenType::Let => {
+                    self.consume(TokenType::Let, "This should never happen.")?;
+                    statements.push(self.let_statement()?);
+                }
+                TokenType::Print => {
+                    self.consume(TokenType::Print, "This should never happen.")?;
+                    statements.push(self.print_statement()?);
+                }
+                _ => {
+                    let found_expression = self.expression()?;
+                    if self.matches(&[TokenType::Semicolon])? {
+                        statements.push(Statement::ExpressionStatement(ExpressionStatement {
+                            expression: found_expression,
+                        }))
+                    } else {
+                        expression = Some(Box::new(found_expression));
+                        break;
+                    }
+                }
+            }
+        }
+        self.consume(TokenType::RightBrace, "Expected '}' to end block.")?;
+        return Ok(Expression::Block(Block {
+            statements,
+            expression,
+        }));
     }
 
     fn equality(&mut self) -> Result<Expression> {
@@ -327,11 +360,11 @@ pub fn parse(source: &str) -> Result<Program> {
     }
      */
     let mut parser = Parser::new(source)?;
-    let mut declarations = Vec::new();
+    let mut statements = Vec::new();
     while !parser.is_at_end() {
-        declarations.push(parser.declaration()?);
+        statements.push(parser.statement()?);
     }
-    let out = Program { declarations };
+    let out = Program { statements };
     println!("{:?}", out);
     return Ok(out);
 }

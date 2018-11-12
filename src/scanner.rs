@@ -23,6 +23,7 @@ pub enum TokenType {
     Minus,
     Plus,
     Semicolon,
+    Colon,
     Slash,
     Star,
 
@@ -34,26 +35,24 @@ pub enum TokenType {
     GreaterEqual,
     Less,
     LessEqual,
+    HashLeftBrace,
 
     Identifier,
     String,
     Number,
 
     And,
-    Class,
     Else,
     False,
-    Fun,
+    Fn,
     For,
     If,
     Nil,
     Or,
     Print,
     Return,
-    Super,
-    This,
     True,
-    Var,
+    Let,
     While,
 
     EOF,
@@ -73,20 +72,17 @@ impl Scanner {
     pub fn new(source: &str) -> Scanner {
         let mut kw_map = std::collections::HashMap::new();
         kw_map.insert("and".to_string(), TokenType::And);
-        kw_map.insert("class".to_string(), TokenType::Class);
         kw_map.insert("else".to_string(), TokenType::Else);
         kw_map.insert("false".to_string(), TokenType::False);
         kw_map.insert("for".to_string(), TokenType::For);
-        kw_map.insert("fun".to_string(), TokenType::Fun);
+        kw_map.insert("fn".to_string(), TokenType::Fn);
         kw_map.insert("if".to_string(), TokenType::If);
         kw_map.insert("nil".to_string(), TokenType::Nil);
         kw_map.insert("or".to_string(), TokenType::Or);
         kw_map.insert("print".to_string(), TokenType::Print);
         kw_map.insert("return".to_string(), TokenType::Return);
-        kw_map.insert("super".to_string(), TokenType::Super);
-        kw_map.insert("this".to_string(), TokenType::This);
         kw_map.insert("true".to_string(), TokenType::True);
-        kw_map.insert("var".to_string(), TokenType::Var);
+        kw_map.insert("let".to_string(), TokenType::Let);
         kw_map.insert("while".to_string(), TokenType::While);
 
         Scanner {
@@ -151,6 +147,15 @@ impl Scanner {
                     TokenType::Greater
                 };
                 Ok(self.make_token(token_type))
+            }
+            '#' => {
+                if self.token_match('{') {
+                    Ok(self.make_token(TokenType::HashLeftBrace))
+                } else {
+                    Err(ScannerError(
+                        "Unexpected character: # without {.".to_string(),
+                    ))
+                }
             }
 
             '"' => self.string(),

@@ -26,35 +26,28 @@ impl Compiler {
     }
 
     fn compile_program(&mut self, program: parser::Program) {
-        for d in program.declarations {
-            self.compile_declaration(d);
+        for d in program.statements {
+            self.compile_statement(d);
         }
-    }
-
-    fn compile_declaration(&mut self, declaration: parser::Declaration) {
-        match declaration {
-            parser::Declaration::VariableDeclaration(v) => self.compile_variable_declaration(v),
-            parser::Declaration::Statement(s) => self.compile_statement(s),
-        }
-    }
-
-    fn compile_variable_declaration(&mut self, variable_declaration: parser::VariableDeclaration) {
-        let local_number = self.next_local;
-        self.locals
-            .insert(variable_declaration.name, self.next_local);
-        self.next_local += 1;
-        variable_declaration.initializer.map(|expression| {
-            self.compile_expression(expression);
-            self.chunk.write_chunk(OpCode::AssignLocal as u8, 1);
-            self.chunk.write_chunk(local_number, 1);
-        });
     }
 
     fn compile_statement(&mut self, statement: parser::Statement) {
         match statement {
+            parser::Statement::LetStatement(v) => self.compile_let_statement(v),
             parser::Statement::PrintStatement(p) => self.compile_print_statement(p),
             parser::Statement::ExpressionStatement(e) => self.compile_expression_statement(e),
         }
+    }
+
+    fn compile_let_statement(&mut self, let_statement: parser::LetStatement) {
+        let local_number = self.next_local;
+        self.locals.insert(let_statement.name, self.next_local);
+        self.next_local += 1;
+        let_statement.initializer.map(|expression| {
+            self.compile_expression(expression);
+            self.chunk.write_chunk(OpCode::AssignLocal as u8, 1);
+            self.chunk.write_chunk(local_number, 1);
+        });
     }
 
     fn compile_print_statement(&mut self, statement: parser::PrintStatement) {
@@ -73,6 +66,7 @@ impl Compiler {
             parser::Expression::Binary(b) => self.compile_binary(b),
             parser::Expression::Grouping(g) => self.compile_grouping(g),
             parser::Expression::Variable(v) => self.compile_variable(v),
+            parser::Expression::Block(b) => self.compile_block(b),
         }
     }
 
@@ -115,5 +109,14 @@ impl Compiler {
         let number = self.locals.get(&variable.name).unwrap();
         self.chunk.write_chunk(OpCode::LoadLocal as u8, 1);
         self.chunk.write_chunk(*number, 1);
+    }
+
+    fn compile_block(&mut self, block: parser::Block) {
+        for s in block.statements {
+            self.compile_statement(s);
+        }
+        block.expression.map(|e| {
+            self.compile_expression(*e);
+        });
     }
 }
