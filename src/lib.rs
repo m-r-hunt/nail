@@ -26,7 +26,7 @@ pub fn repl() {
             }
         }
 
-        let result = vm.interpret(&line);
+        let result = vm.interpret(&format!("fn main() {{{}}}", line));
         match result {
             Ok(_) => {}
             Err(e) => {
@@ -45,6 +45,6 @@ pub fn run_file(filename: &str) {
     match result {
         Ok(_) => {}
         Err(vm::InterpreterError::CompileError(_)) => return,
-        Err(vm::InterpreterError::RuntimeError) => return,
+        Err(vm::InterpreterError::RuntimeError(_)) => return,
     }
 }

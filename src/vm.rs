@@ -13,7 +13,7 @@ pub struct VM {
 #[derive(Debug)]
 pub enum InterpreterError {
     CompileError(NotloxError),
-    RuntimeError,
+    RuntimeError(String),
 }
 
 impl From<NotloxError> for InterpreterError {
@@ -26,7 +26,7 @@ impl std::fmt::Display for InterpreterError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             InterpreterError::CompileError(c) => c.fmt(f),
-            InterpreterError::RuntimeError => write!(f, "{}", "Runtime Error",),
+            InterpreterError::RuntimeError(s) => write!(f, "Runtime Error: {}", s),
         }
     }
 }
@@ -40,13 +40,13 @@ macro_rules! binary_op {
             if let value::Value::Number(bval) = $self.pop() {
                 b = bval;
             } else {
-                return Err(InterpreterError::RuntimeError);
+                return Err(InterpreterError::RuntimeError("Bad argument to binary operator, not a number.".to_string()));
             }
             let mut a: f64;
             if let value::Value::Number(aval) = $self.pop() {
                 a = aval;
             } else {
-                return Err(InterpreterError::RuntimeError);
+                return Err(InterpreterError::RuntimeError("Bad argument to binary operator, not a number.".to_string()));
             }
             $self.push(value::Value::Number(a $op b))
         }
@@ -67,7 +67,7 @@ impl VM {
     pub fn interpret(&mut self, source: &str) -> Result<(), InterpreterError> {
         let chunk = compiler::compile(source)?;
         self.chunk = chunk;
-        self.ip = 0;
+        self.ip = *self.chunk.functions.get("main").unwrap();
         self.run()
     }
 
@@ -96,7 +96,9 @@ impl VM {
                     if let value::Value::Number(value) = self.pop() {
                         self.push(value::Value::Number(-value));
                     } else {
-                        return Err(InterpreterError::RuntimeError);
+                        return Err(InterpreterError::RuntimeError(
+                            "Bad argument to unary operator, not a number.".to_string(),
+                        ));
                     }
                 }
 
@@ -124,7 +126,20 @@ impl VM {
                     self.pop();
                 }
 
-                None => return Err(InterpreterError::RuntimeError),
+                Some(chunk::OpCode::FunctionEntry) => {
+                    let _argn = self.read_byte();
+                    // Todo: Reserve space for locals when this works properly
+                }
+                Some(chunk::OpCode::Call) => {
+                    let offset = self.read_byte();
+                    self.ip += offset as usize;
+                }
+
+                None => {
+                    return Err(InterpreterError::RuntimeError(
+                        "Bad instruction".to_string(),
+                    ))
+                }
             }
         }
     }

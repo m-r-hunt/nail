@@ -21,6 +21,9 @@ pub enum OpCode {
 
     PushNil = 11,
     Pop = 12,
+
+    FunctionEntry = 13,
+    Call = 14,
 }
 
 impl OpCode {
@@ -45,6 +48,9 @@ impl OpCode {
             11 => Some(OpCode::PushNil),
             12 => Some(OpCode::Pop),
 
+            13 => Some(OpCode::FunctionEntry),
+            14 => Some(OpCode::Call),
+
             _ => None,
         }
     }
@@ -55,6 +61,7 @@ pub struct Chunk {
     pub code: Vec<u8>,
     pub lines: Vec<usize>,
     pub constants: Vec<Value>,
+    pub functions: std::collections::HashMap<String, usize>,
 }
 
 impl Chunk {
@@ -70,5 +77,14 @@ impl Chunk {
     pub fn add_constant(&mut self, value: Value) -> u8 {
         self.constants.push(value);
         return (self.constants.len() - 1) as u8;
+    }
+
+    pub fn add_function(&mut self, name: String, arity: u8, line: usize) {
+        let address = self.code.len();
+        self.code.push(OpCode::FunctionEntry as u8);
+        self.lines.push(line);
+        self.code.push(arity);
+        self.lines.push(line);
+        self.functions.insert(name, address);
     }
 }

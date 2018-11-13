@@ -5,7 +5,6 @@ pub fn compile(source: &str) -> Result<chunk::Chunk> {
     let ast = parser::parse(source)?;
     let mut compiler = Compiler::new();
     compiler.compile_program(ast);
-    compiler.chunk.write_chunk(OpCode::Return as u8, 1);
     debug::disassemble_chunk(&compiler.chunk, "foo.nlx");
     Ok(compiler.chunk)
 }
@@ -66,7 +65,8 @@ impl Compiler {
     }
 
     fn compile_fn_statement(&mut self, fn_statement: parser::FnStatement) {
-        // Bind name.
+        self.chunk
+            .add_function(fn_statement.name, fn_statement.args.len() as u8, 1);
         for arg in fn_statement.args.into_iter().rev() {
             let local_number = self.bind_local(arg);
             self.chunk.write_chunk(OpCode::AssignLocal as u8, 1);
