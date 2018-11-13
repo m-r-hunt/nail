@@ -36,13 +36,18 @@ impl Compiler {
             parser::Statement::LetStatement(v) => self.compile_let_statement(v),
             parser::Statement::PrintStatement(p) => self.compile_print_statement(p),
             parser::Statement::ExpressionStatement(e) => self.compile_expression_statement(e),
+            parser::Statement::FnStatement(f) => self.compile_fn_statement(f),
         }
     }
 
-    fn compile_let_statement(&mut self, let_statement: parser::LetStatement) {
-        let local_number = self.next_local;
-        self.locals.insert(let_statement.name, self.next_local);
+    fn bind_local(&mut self, name: String) -> u8 {
+        self.locals.insert(name, self.next_local);
         self.next_local += 1;
+        self.next_local - 1
+    }
+
+    fn compile_let_statement(&mut self, let_statement: parser::LetStatement) {
+        let local_number = self.bind_local(let_statement.name);
         let_statement.initializer.map(|expression| {
             self.compile_expression(expression);
             self.chunk.write_chunk(OpCode::AssignLocal as u8, 1);
@@ -58,6 +63,17 @@ impl Compiler {
     fn compile_expression_statement(&mut self, statement: parser::ExpressionStatement) {
         self.compile_expression(statement.expression);
         self.chunk.write_chunk(OpCode::Pop as u8, 1);
+    }
+
+    fn compile_fn_statement(&mut self, fn_statement: parser::FnStatement) {
+        // Bind name.
+        for arg in fn_statement.args.into_iter().rev() {
+            let local_number = self.bind_local(arg);
+            self.chunk.write_chunk(OpCode::AssignLocal as u8, 1);
+            self.chunk.write_chunk(local_number, 1);
+        }
+        self.compile_block(fn_statement.block);
+        self.chunk.write_chunk(OpCode::Return as u8, 1);
     }
 
     fn compile_expression(&mut self, expression: parser::Expression) {

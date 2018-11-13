@@ -73,10 +73,18 @@ pub struct LetStatement {
 }
 
 #[derive(Debug)]
+pub struct FnStatement {
+    pub name: String,
+    pub args: Vec<String>,
+    pub block: Block,
+}
+
+#[derive(Debug)]
 pub enum Statement {
     ExpressionStatement(ExpressionStatement),
     LetStatement(LetStatement),
     PrintStatement(PrintStatement),
+    FnStatement(FnStatement),
 }
 
 #[derive(Debug)]
@@ -101,6 +109,9 @@ impl Parser {
         }
         if self.matches(&[TokenType::Let])? {
             return self.let_statement();
+        }
+        if self.matches(&[TokenType::Fn])? {
+            return self.fn_statement();
         }
 
         return self.expression_statement();
@@ -128,24 +139,46 @@ impl Parser {
         return Ok(Statement::PrintStatement(PrintStatement { value }));
     }
 
+    fn fn_statement(&mut self) -> Result<Statement> {
+        let name = self.consume(TokenType::Identifier, "Expected function name.")?;
+        let name = self.scanner.get_lexeme(&name);
+
+        self.consume(TokenType::LeftParen, "Expected '(' for fn arg list")?;
+        let mut args = Vec::new();
+        if self.matches(&[TokenType::Identifier])? {
+            let arg_name = self.previous();
+            args.push(self.scanner.get_lexeme(&arg_name));
+            // Todo: Technically this loop will accept extra commas (as well as trailing, which is intended). Fine for now, maybe worth fixing at some point.
+            while self.matches(&[TokenType::Comma])? {
+                if self.matches(&[TokenType::Identifier])? {
+                    let arg_name = self.previous();
+                    args.push(self.scanner.get_lexeme(&arg_name));
+                }
+            }
+        }
+        self.consume(TokenType::RightParen, "Expected ')' for fn arg list")?;
+
+        let block = self.block()?;
+
+        return Ok(Statement::FnStatement(FnStatement { name, args, block }));
+    }
+
     fn expression_statement(&mut self) -> Result<Statement> {
         let expression = self.expression()?;
         self.consume(TokenType::Semicolon, "Expect ';' after value.")?;
         return Ok(Statement::ExpressionStatement(ExpressionStatement {
             expression,
         }));
-
-        // Todo: Add pop.
     }
 
     fn expression(&mut self) -> Result<Expression> {
         if self.peek().token_type == TokenType::LeftBrace {
-            return self.block();
+            return Ok(Expression::Block(self.block()?));
         }
         return self.equality();
     }
 
-    fn block(&mut self) -> Result<Expression> {
+    fn block(&mut self) -> Result<Block> {
         self.consume(TokenType::LeftBrace, "Expected '{' to start block.")?;
         let mut statements = Vec::new();
         let mut expression = None;
@@ -158,6 +191,10 @@ impl Parser {
                 TokenType::Print => {
                     self.consume(TokenType::Print, "This should never happen.")?;
                     statements.push(self.print_statement()?);
+                }
+                TokenType::Fn => {
+                    self.consume(TokenType::Fn, "This should never happen.")?;
+                    statements.push(self.fn_statement()?);
                 }
                 _ => {
                     let found_expression = self.expression()?;
@@ -173,10 +210,10 @@ impl Parser {
             }
         }
         self.consume(TokenType::RightBrace, "Expected '}' to end block.")?;
-        return Ok(Expression::Block(Block {
+        return Ok(Block {
             statements,
             expression,
-        }));
+        });
     }
 
     fn equality(&mut self) -> Result<Expression> {
