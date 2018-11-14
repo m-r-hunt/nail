@@ -13,6 +13,7 @@ struct Compiler {
     chunk: chunk::Chunk,
     locals: HashMap<String, u8>,
     next_local: u8,
+    deferred: Vec<parser::FnStatement>,
 }
 
 impl Compiler {
@@ -21,21 +22,27 @@ impl Compiler {
             chunk: chunk::Chunk::new(),
             locals: HashMap::new(),
             next_local: 0,
+            deferred: Vec::new(),
         }
     }
 
     fn compile_program(&mut self, program: parser::Program) {
         for d in program.statements {
-            self.compile_statement(d);
+            self.compile_statement(d, true);
+        }
+
+        while self.deferred.len() > 0 {
+            let fn_statement = self.deferred.pop().unwrap();
+            self.compile_fn_statement(fn_statement, true);
         }
     }
 
-    fn compile_statement(&mut self, statement: parser::Statement) {
+    fn compile_statement(&mut self, statement: parser::Statement, top_level: bool) {
         match statement {
             parser::Statement::LetStatement(v) => self.compile_let_statement(v),
             parser::Statement::PrintStatement(p) => self.compile_print_statement(p),
             parser::Statement::ExpressionStatement(e) => self.compile_expression_statement(e),
-            parser::Statement::FnStatement(f) => self.compile_fn_statement(f),
+            parser::Statement::FnStatement(f) => self.compile_fn_statement(f, top_level),
         }
     }
 
@@ -64,16 +71,22 @@ impl Compiler {
         self.chunk.write_chunk(OpCode::Pop as u8, 1);
     }
 
-    fn compile_fn_statement(&mut self, fn_statement: parser::FnStatement) {
+    fn compile_fn_statement(&mut self, fn_statement: parser::FnStatement, top_level: bool) {
         self.chunk
-            .add_function(fn_statement.name, fn_statement.args.len() as u8, 1);
-        for arg in fn_statement.args.into_iter().rev() {
-            let local_number = self.bind_local(arg);
-            self.chunk.write_chunk(OpCode::AssignLocal as u8, 1);
-            self.chunk.write_chunk(local_number, 1);
+            .register_function(fn_statement.name.clone(), fn_statement.args.len() as u8);
+        if !top_level {
+            self.deferred.push(fn_statement);
+        } else {
+            self.chunk
+                .start_function(fn_statement.name, fn_statement.args.len() as u8, 1);
+            for arg in fn_statement.args.into_iter().rev() {
+                let local_number = self.bind_local(arg);
+                self.chunk.write_chunk(OpCode::AssignLocal as u8, 1);
+                self.chunk.write_chunk(local_number, 1);
+            }
+            self.compile_block(fn_statement.block);
+            self.chunk.write_chunk(OpCode::Return as u8, 1);
         }
-        self.compile_block(fn_statement.block);
-        self.chunk.write_chunk(OpCode::Return as u8, 1);
     }
 
     fn compile_expression(&mut self, expression: parser::Expression) {
@@ -84,6 +97,7 @@ impl Compiler {
             parser::Expression::Grouping(g) => self.compile_grouping(g),
             parser::Expression::Variable(v) => self.compile_variable(v),
             parser::Expression::Block(b) => self.compile_block(b),
+            parser::Expression::Call(c) => self.compile_call(c),
         }
     }
 
@@ -130,11 +144,24 @@ impl Compiler {
 
     fn compile_block(&mut self, block: parser::Block) {
         for s in block.statements {
-            self.compile_statement(s);
+            self.compile_statement(s, false);
         }
         match block.expression {
             Some(e) => self.compile_expression(*e),
             None => self.chunk.write_chunk(OpCode::PushNil as u8, 1),
+        }
+    }
+
+    fn compile_call(&mut self, call: parser::Call) {
+        for e in call.args {
+            self.compile_expression(e);
+        }
+        self.chunk.write_chunk(OpCode::Call as u8, 1);
+        if let parser::Expression::Variable(v) = *call.callee {
+            let fn_number = *self.chunk.function_names.get(&v.name).unwrap();
+            self.chunk.write_chunk(fn_number, 1);
+        } else {
+            panic!("Expected variable in call");
         }
     }
 }

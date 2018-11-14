@@ -61,7 +61,8 @@ pub struct Chunk {
     pub code: Vec<u8>,
     pub lines: Vec<usize>,
     pub constants: Vec<Value>,
-    pub functions: std::collections::HashMap<String, usize>,
+    pub function_names: std::collections::HashMap<String, u8>,
+    pub function_locations: Vec<usize>,
 }
 
 impl Chunk {
@@ -79,12 +80,28 @@ impl Chunk {
         return (self.constants.len() - 1) as u8;
     }
 
-    pub fn add_function(&mut self, name: String, arity: u8, line: usize) {
+    pub fn register_function(&mut self, name: String, _arity: u8) {
+        use std::collections::hash_map::Entry;
+        match self.function_names.entry(name) {
+            Entry::Vacant(v) => {
+                v.insert(self.function_locations.len() as u8);
+                self.function_locations.push(0);
+            }
+            _ => {}
+        };
+    }
+
+    pub fn start_function(&mut self, name: String, arity: u8, line: usize) {
         let address = self.code.len();
         self.code.push(OpCode::FunctionEntry as u8);
         self.lines.push(line);
         self.code.push(arity);
         self.lines.push(line);
-        self.functions.insert(name, address);
+        self.function_locations[*self.function_names.get(&name).unwrap() as usize] = address;
+    }
+
+    pub fn lookup_function(&self, name: &str) -> usize {
+        let number = self.function_names.get(name).unwrap();
+        return self.function_locations[*number as usize];
     }
 }

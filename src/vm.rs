@@ -67,7 +67,7 @@ impl VM {
     pub fn interpret(&mut self, source: &str) -> Result<(), InterpreterError> {
         let chunk = compiler::compile(source)?;
         self.chunk = chunk;
-        self.ip = *self.chunk.functions.get("main").unwrap();
+        self.ip = self.chunk.lookup_function("main");
         self.run()
     }
 
@@ -80,11 +80,14 @@ impl VM {
                 }
                 println!();
                 debug::disassemble_instruction(&self.chunk, self.ip);
+                let mut buf = [0; 10];
+                use std::io::Read;
+                std::io::stdin().read(&mut buf).unwrap();
             }
             let instruction = self.read_byte();
             match chunk::OpCode::try_from(instruction) {
                 Some(chunk::OpCode::Return) => {
-                    return Ok(());
+                    return Ok(()); // Todo: Fix!
                 }
 
                 Some(chunk::OpCode::Constant) => {
@@ -131,8 +134,8 @@ impl VM {
                     // Todo: Reserve space for locals when this works properly
                 }
                 Some(chunk::OpCode::Call) => {
-                    let offset = self.read_byte();
-                    self.ip += offset as usize;
+                    let fn_number = self.read_byte();
+                    self.ip = self.chunk.function_locations[fn_number as usize];
                 }
 
                 None => {

@@ -47,6 +47,12 @@ pub struct Block {
 }
 
 #[derive(Debug)]
+pub struct Call {
+    pub callee: Box<Expression>,
+    pub args: Vec<Expression>,
+}
+
+#[derive(Debug)]
 pub enum Expression {
     Literal(Literal),
     Unary(Unary),
@@ -54,6 +60,7 @@ pub enum Expression {
     Grouping(Grouping),
     Variable(Variable),
     Block(Block),
+    Call(Call),
 }
 
 #[derive(Debug)]
@@ -286,7 +293,40 @@ impl Parser {
                 expression: Box::new(expression),
             }));
         }
-        return self.primary();
+        return self.call();
+    }
+
+    fn call(&mut self) -> Result<Expression> {
+        let mut expression = self.primary();
+
+        loop {
+            if self.matches(&[TokenType::LeftParen])? {
+                expression = self.finish_call(expression?);
+            } else {
+                break;
+            }
+        }
+
+        return expression;
+    }
+
+    fn finish_call(&mut self, callee: Expression) -> Result<Expression> {
+        let mut args = Vec::new();
+        if !self.check(TokenType::RightParen) {
+            loop {
+                args.push(self.expression()?);
+                if !self.matches(&[TokenType::Comma])? {
+                    break;
+                }
+            }
+        }
+
+        self.consume(TokenType::RightParen, "Expected ')' after arguments.")?;
+
+        return Ok(Expression::Call(Call {
+            callee: Box::new(callee),
+            args,
+        }));
     }
 
     fn primary(&mut self) -> Result<Expression> {
