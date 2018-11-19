@@ -2,12 +2,22 @@ use super::{chunk, compiler, debug, errors::NotloxError, value};
 
 const STACK_SIZE: usize = 256;
 
+#[derive(Copy, Clone, Debug)]
+struct CallFrame {
+    return_address: usize,
+    locals_base: usize,
+}
+
 pub struct VM {
     chunk: chunk::Chunk,
     ip: usize,
     stack: [value::Value; STACK_SIZE],
     stack_top: usize,
+    return_stack: [CallFrame; 256],
+    return_stack_top: usize,
     locals: [value::Value; 256],
+    locals_base: usize,
+    locals_top: usize,
 }
 
 #[derive(Debug)]
@@ -60,7 +70,14 @@ impl VM {
             ip: 0,
             stack: [value::Value::Nil; STACK_SIZE],
             stack_top: 0,
+            return_stack: [CallFrame {
+                return_address: 0,
+                locals_base: 0,
+            }; 256],
+            return_stack_top: 0,
             locals: [value::Value::Nil; 256],
+            locals_base: 0,
+            locals_top: 0,
         }
     }
 
@@ -87,7 +104,15 @@ impl VM {
             let instruction = self.read_byte();
             match chunk::OpCode::try_from(instruction) {
                 Some(chunk::OpCode::Return) => {
-                    return Ok(()); // Todo: Fix!
+                    if self.return_stack_top > 0 {
+                        let call_frame = self.return_stack[self.return_stack_top - 1];
+                        self.return_stack_top -= 1;
+                        self.locals_top = self.locals_base;
+                        self.locals_base = call_frame.locals_base;
+                        self.ip = call_frame.return_address;
+                    } else {
+                        return Ok(());
+                    }
                 }
 
                 Some(chunk::OpCode::Constant) => {
@@ -113,11 +138,21 @@ impl VM {
                 Some(chunk::OpCode::Print) => println!("{}", self.pop()),
 
                 Some(chunk::OpCode::AssignLocal) => {
-                    let number = self.read_byte();
+                    let number = self.read_byte() as usize + self.locals_base;
+                    if number >= self.locals_top {
+                        return Err(InterpreterError::RuntimeError(
+                            "Local store out of range".to_string(),
+                        ));
+                    }
                     self.locals[number as usize] = self.pop();
                 }
                 Some(chunk::OpCode::LoadLocal) => {
-                    let number = self.read_byte();
+                    let number = self.read_byte() as usize + self.locals_base;
+                    if number >= self.locals_top {
+                        return Err(InterpreterError::RuntimeError(
+                            "Local load out of range".to_string(),
+                        ));
+                    }
                     let value = self.locals[number as usize];
                     self.push(value);
                 }
@@ -130,12 +165,18 @@ impl VM {
                 }
 
                 Some(chunk::OpCode::FunctionEntry) => {
-                    let _argn = self.read_byte();
-                    // Todo: Reserve space for locals when this works properly
+                    let localsn = self.read_byte() as usize;
+                    self.locals_top = self.locals_base + localsn;
                 }
                 Some(chunk::OpCode::Call) => {
                     let fn_number = self.read_byte();
+                    self.return_stack[self.return_stack_top] = CallFrame {
+                        return_address: self.ip,
+                        locals_base: self.locals_base,
+                    };
+                    self.return_stack_top += 1;
                     self.ip = self.chunk.function_locations[fn_number as usize];
+                    self.locals_base = self.locals_top;
                 }
 
                 None => {

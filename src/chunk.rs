@@ -91,13 +91,15 @@ impl Chunk {
         };
     }
 
-    pub fn start_function(&mut self, name: String, arity: u8, line: usize) {
+    pub fn start_function(&mut self, name: String, line: usize) -> usize {
         let address = self.code.len();
         self.code.push(OpCode::FunctionEntry as u8);
         self.lines.push(line);
-        self.code.push(arity);
+        let ret = self.code.len();
+        self.code.push(0);
         self.lines.push(line);
         self.function_locations[*self.function_names.get(&name).unwrap() as usize] = address;
+        return ret;
     }
 
     pub fn lookup_function(&self, name: &str) -> usize {

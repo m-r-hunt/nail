@@ -27,6 +27,7 @@ struct Compiler {
     chunk: chunk::Chunk,
     environments: Vec<Environment>,
     deferred: Vec<parser::FnStatement>,
+    max_local: u8,
 }
 
 impl Compiler {
@@ -35,6 +36,7 @@ impl Compiler {
             chunk: chunk::Chunk::new(),
             environments: vec![Environment::new(0)],
             deferred: Vec::new(),
+            max_local: 0,
         }
     }
 
@@ -80,6 +82,7 @@ impl Compiler {
         let current_env = self.environments.last_mut().unwrap();
         current_env.locals.insert(name, current_env.next_local);
         current_env.next_local += 1;
+        self.max_local += 1;
         current_env.next_local - 1
     }
 
@@ -108,8 +111,8 @@ impl Compiler {
         if !top_level {
             self.deferred.push(fn_statement);
         } else {
-            self.chunk
-                .start_function(fn_statement.name, fn_statement.args.len() as u8, 1);
+            self.max_local = 0;
+            let locals_addr = self.chunk.start_function(fn_statement.name, 1);
             for arg in fn_statement.args.into_iter().rev() {
                 let local_number = self.bind_local(arg);
                 self.chunk.write_chunk(OpCode::AssignLocal as u8, 1);
@@ -117,6 +120,7 @@ impl Compiler {
             }
             self.compile_block(fn_statement.block);
             self.chunk.write_chunk(OpCode::Return as u8, 1);
+            self.chunk.code[locals_addr] = self.max_local;
         }
     }
 
