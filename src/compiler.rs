@@ -9,10 +9,20 @@ pub fn compile(source: &str) -> Result<chunk::Chunk> {
     Ok(compiler.chunk)
 }
 
-struct Compiler {
-    chunk: chunk::Chunk,
+struct Environment {
     locals: HashMap<String, u8>,
     next_local: u8,
+}
+
+impl Environment {
+    fn new(next_local: u8) -> Self {
+        Self{locals: HashMap::new(), next_local}
+    }
+}
+
+struct Compiler {
+    chunk: chunk::Chunk,
+    environments: Vec<Environment>,
     deferred: Vec<parser::FnStatement>,
 }
 
@@ -20,10 +30,27 @@ impl Compiler {
     fn new() -> Self {
         Compiler {
             chunk: chunk::Chunk::new(),
-            locals: HashMap::new(),
-            next_local: 0,
+            environments: vec![Environment::new(0)],
             deferred: Vec::new(),
         }
+    }
+
+    fn push_environment(&mut self) {
+        let new_env = Environment::new(self.environments.last().unwrap().next_local);
+        self.environments.push(new_env);
+    }
+
+    fn pop_environment(&mut self) {
+        self.environments.pop();
+    }
+
+    fn find_local(&self, name: &str) -> Option<u8> {
+        for e in self.environments.iter().rev() {
+            if let Some(n) = e.locals.get(name) {
+                return Some(*n);
+            }
+        }
+        return None;
     }
 
     fn compile_program(&mut self, program: parser::Program) {
@@ -47,9 +74,10 @@ impl Compiler {
     }
 
     fn bind_local(&mut self, name: String) -> u8 {
-        self.locals.insert(name, self.next_local);
-        self.next_local += 1;
-        self.next_local - 1
+        let current_env = self.environments.last_mut().unwrap();
+        current_env.locals.insert(name, current_env.next_local);
+        current_env.next_local += 1;
+        current_env.next_local - 1
     }
 
     fn compile_let_statement(&mut self, let_statement: parser::LetStatement) {
@@ -137,12 +165,13 @@ impl Compiler {
     }
 
     fn compile_variable(&mut self, variable: parser::Variable) {
-        let number = self.locals.get(&variable.name).unwrap();
+        let number = self.find_local(&variable.name).unwrap();
         self.chunk.write_chunk(OpCode::LoadLocal as u8, 1);
-        self.chunk.write_chunk(*number, 1);
+        self.chunk.write_chunk(number, 1);
     }
 
     fn compile_block(&mut self, block: parser::Block) {
+        self.push_environment();
         for s in block.statements {
             self.compile_statement(s, false);
         }
@@ -150,6 +179,7 @@ impl Compiler {
             Some(e) => self.compile_expression(*e),
             None => self.chunk.write_chunk(OpCode::PushNil as u8, 1),
         }
+        self.pop_environment();
     }
 
     fn compile_call(&mut self, call: parser::Call) {
