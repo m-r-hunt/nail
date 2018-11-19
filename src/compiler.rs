@@ -16,7 +16,10 @@ struct Environment {
 
 impl Environment {
     fn new(next_local: u8) -> Self {
-        Self{locals: HashMap::new(), next_local}
+        Self {
+            locals: HashMap::new(),
+            next_local,
+        }
     }
 }
 

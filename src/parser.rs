@@ -179,13 +179,22 @@ impl Parser {
     }
 
     fn expression(&mut self) -> Result<Expression> {
-        if self.peek().token_type == TokenType::LeftBrace {
-            return Ok(Expression::Block(self.block()?));
-        }
         return self.equality();
     }
 
+    fn can_be_statement_without_semicolon(&self, expression: &Expression) -> bool {
+        match expression {
+            Expression::Block(_) => true,
+            _ => false,
+        }
+    }
+
     fn block(&mut self) -> Result<Block> {
+        // TODO: Block parsing is inconsistent with rust when a block has no
+        // semicolon followed by a newline in a statement context.
+        // Ex: https://doc.rust-lang.org/reference/statements.html
+        // We always parse as a full statement.
+        // Correct solution may be to insert semicolons in lexer?
         self.consume(TokenType::LeftBrace, "Expected '{' to start block.")?;
         let mut statements = Vec::new();
         let mut expression = None;
@@ -205,7 +214,10 @@ impl Parser {
                 }
                 _ => {
                     let found_expression = self.expression()?;
-                    if self.matches(&[TokenType::Semicolon])? {
+                    if self.matches(&[TokenType::Semicolon])?
+                        || (self.can_be_statement_without_semicolon(&found_expression)
+                            && !(self.peek().token_type == TokenType::RightBrace))
+                    {
                         statements.push(Statement::ExpressionStatement(ExpressionStatement {
                             expression: found_expression,
                         }))
@@ -330,6 +342,9 @@ impl Parser {
     }
 
     fn primary(&mut self) -> Result<Expression> {
+        if self.peek().token_type == TokenType::LeftBrace {
+            return Ok(Expression::Block(self.block()?));
+        }
         if self.matches(&[TokenType::False])? {
             return Ok(Expression::Literal(Literal::False));
         }
