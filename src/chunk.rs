@@ -24,6 +24,14 @@ pub enum OpCode {
 
     FunctionEntry = 13,
     Call = 14,
+
+    JumpIfFalse = 15,
+    Jump = 16,
+
+    TestLess = 17,
+    TestLessOrEqual = 18,
+    TestGreater = 19,
+    TestGreaterOrEqual = 20,
 }
 
 impl OpCode {
@@ -50,6 +58,14 @@ impl OpCode {
 
             13 => Some(OpCode::FunctionEntry),
             14 => Some(OpCode::Call),
+
+            15 => Some(OpCode::JumpIfFalse),
+            16 => Some(OpCode::Jump),
+
+            17 => Some(OpCode::TestLess),
+            18 => Some(OpCode::TestLessOrEqual),
+            19 => Some(OpCode::TestGreater),
+            20 => Some(OpCode::TestGreaterOrEqual),
 
             _ => None,
         }

@@ -41,6 +41,14 @@ pub fn disassemble_instruction(chunk: &Chunk, offset: usize) -> usize {
         Some(OpCode::FunctionEntry) => number_instruction("OP_FN_ENTRY", &chunk, offset),
         Some(OpCode::Call) => number_instruction("OP_CALL", &chunk, offset),
 
+        Some(OpCode::JumpIfFalse) => number_instruction("OP_JUMP_IF_FALSE", &chunk, offset),
+        Some(OpCode::Jump) => number_instruction("OP_JUMP", &chunk, offset),
+
+        Some(OpCode::TestLess) => simple_instruction("OP_TEST_LESS", offset),
+        Some(OpCode::TestLessOrEqual) => simple_instruction("OP_TEST_LESS_OR_EQUAL", offset),
+        Some(OpCode::TestGreater) => simple_instruction("OP_TEST_GREATER", offset),
+        Some(OpCode::TestGreaterOrEqual) => simple_instruction("OP_TEST_GREATER_OR_EQUAL", offset),
+
         None => {
             println!("Unknown opcode {}", instr);
             offset + 1

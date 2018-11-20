@@ -133,6 +133,7 @@ impl Compiler {
             parser::Expression::Variable(v) => self.compile_variable(v),
             parser::Expression::Block(b) => self.compile_block(b),
             parser::Expression::Call(c) => self.compile_call(c),
+            parser::Expression::If(i) => self.compile_if(i),
         }
     }
 
@@ -163,6 +164,10 @@ impl Compiler {
             TokenType::Minus => self.chunk.write_chunk(OpCode::Subtract as u8, 1),
             TokenType::Star => self.chunk.write_chunk(OpCode::Multiply as u8, 1),
             TokenType::Slash => self.chunk.write_chunk(OpCode::Divide as u8, 1),
+            TokenType::Less => self.chunk.write_chunk(OpCode::TestLess as u8, 1),
+            TokenType::LessEqual => self.chunk.write_chunk(OpCode::TestLessOrEqual as u8, 1),
+            TokenType::Greater => self.chunk.write_chunk(OpCode::TestGreater as u8, 1),
+            TokenType::GreaterEqual => self.chunk.write_chunk(OpCode::TestGreaterOrEqual as u8, 1),
             _ => panic!("Unimplemented binary operator"),
         }
     }
@@ -200,5 +205,24 @@ impl Compiler {
         } else {
             panic!("Expected variable in call");
         }
+    }
+
+    fn compile_if(&mut self, if_expression: parser::If) {
+        self.compile_expression(*if_expression.condition);
+        self.chunk.write_chunk(OpCode::JumpIfFalse as u8, 1);
+        self.chunk.write_chunk(0, 1);
+        let jump_target_address = self.chunk.code.len() - 1;
+        self.compile_block(if_expression.then_block);
+        self.chunk.write_chunk(OpCode::Jump as u8, 1);
+        self.chunk.write_chunk(0, 1);
+        let else_target_address = self.chunk.code.len() - 1;
+        self.chunk.code[jump_target_address] =
+            (self.chunk.code.len() - jump_target_address - 1) as u8;
+        match if_expression.else_block {
+            Some(b) => self.compile_block(b),
+            None => self.chunk.write_chunk(OpCode::PushNil as u8, 1),
+        }
+        self.chunk.code[else_target_address] =
+            (self.chunk.code.len() - else_target_address - 1) as u8;
     }
 }

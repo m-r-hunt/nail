@@ -53,6 +53,13 @@ pub struct Call {
 }
 
 #[derive(Debug)]
+pub struct If {
+    pub condition: Box<Expression>,
+    pub then_block: Block,
+    pub else_block: Option<Block>,
+}
+
+#[derive(Debug)]
 pub enum Expression {
     Literal(Literal),
     Unary(Unary),
@@ -61,6 +68,7 @@ pub enum Expression {
     Variable(Variable),
     Block(Block),
     Call(Call),
+    If(If),
 }
 
 #[derive(Debug)]
@@ -341,9 +349,26 @@ impl Parser {
         }));
     }
 
+    fn if_expression(&mut self) -> Result<Expression> {
+        let condition = Box::new(self.expression()?);
+        let then_block = self.block()?;
+        let mut else_block = None;
+        if self.matches(&[TokenType::Else])? {
+            else_block = Some(self.block()?);
+        }
+        return Ok(Expression::If(If {
+            condition,
+            then_block,
+            else_block,
+        }));
+    }
+
     fn primary(&mut self) -> Result<Expression> {
         if self.peek().token_type == TokenType::LeftBrace {
             return Ok(Expression::Block(self.block()?));
+        }
+        if self.matches(&[TokenType::If])? {
+            return self.if_expression();
         }
         if self.matches(&[TokenType::False])? {
             return Ok(Expression::Literal(Literal::False));

@@ -44,7 +44,7 @@ impl std::fmt::Display for InterpreterError {
 impl std::error::Error for InterpreterError {}
 
 macro_rules! binary_op {
-    ( $self:expr, $op:tt ) => {
+    ( $self:expr, $op:tt, $ret:ident ) => {
         {
             let mut b: f64;
             if let value::Value::Number(bval) = $self.pop() {
@@ -58,7 +58,7 @@ macro_rules! binary_op {
             } else {
                 return Err(InterpreterError::RuntimeError("Bad argument to binary operator, not a number.".to_string()));
             }
-            $self.push(value::Value::Number(a $op b))
+            $self.push(value::Value::$ret(a $op b))
         }
     }
 }
@@ -130,10 +130,10 @@ impl VM {
                     }
                 }
 
-                Some(chunk::OpCode::Add) => binary_op!(self, +),
-                Some(chunk::OpCode::Subtract) => binary_op!(self, -),
-                Some(chunk::OpCode::Multiply) => binary_op!(self, *),
-                Some(chunk::OpCode::Divide) => binary_op!(self, /),
+                Some(chunk::OpCode::Add) => binary_op!(self, +, Number),
+                Some(chunk::OpCode::Subtract) => binary_op!(self, -, Number),
+                Some(chunk::OpCode::Multiply) => binary_op!(self, *, Number),
+                Some(chunk::OpCode::Divide) => binary_op!(self, /, Number),
 
                 Some(chunk::OpCode::Print) => println!("{}", self.pop()),
 
@@ -178,6 +178,23 @@ impl VM {
                     self.ip = self.chunk.function_locations[fn_number as usize];
                     self.locals_base = self.locals_top;
                 }
+
+                Some(chunk::OpCode::JumpIfFalse) => {
+                    let target = self.read_byte();
+                    let value = self.pop();
+                    if value.is_falsey() {
+                        self.ip += target as usize;
+                    }
+                }
+                Some(chunk::OpCode::Jump) => {
+                    let target = self.read_byte();
+                    self.ip += target as usize;
+                }
+
+                Some(chunk::OpCode::TestLess) => binary_op!(self, <, Boolean),
+                Some(chunk::OpCode::TestLessOrEqual) => binary_op!(self, <=, Boolean),
+                Some(chunk::OpCode::TestGreater) => binary_op!(self, >, Boolean),
+                Some(chunk::OpCode::TestGreaterOrEqual) => binary_op!(self, >=, Boolean),
 
                 None => {
                     return Err(InterpreterError::RuntimeError(
