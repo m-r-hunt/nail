@@ -60,6 +60,12 @@ pub struct If {
 }
 
 #[derive(Debug)]
+pub struct While {
+    pub condition: Box<Expression>,
+    pub block: Block,
+}
+
+#[derive(Debug)]
 pub enum Expression {
     Literal(Literal),
     Unary(Unary),
@@ -69,6 +75,7 @@ pub enum Expression {
     Block(Block),
     Call(Call),
     If(If),
+    While(While),
 }
 
 #[derive(Debug)]
@@ -363,12 +370,21 @@ impl Parser {
         }));
     }
 
+    fn while_expression(&mut self) -> Result<Expression> {
+        let condition = Box::new(self.expression()?);
+        let block = self.block()?;
+        return Ok(Expression::While(While { condition, block }));
+    }
+
     fn primary(&mut self) -> Result<Expression> {
         if self.peek().token_type == TokenType::LeftBrace {
             return Ok(Expression::Block(self.block()?));
         }
         if self.matches(&[TokenType::If])? {
             return self.if_expression();
+        }
+        if self.matches(&[TokenType::While])? {
+            return self.while_expression();
         }
         if self.matches(&[TokenType::False])? {
             return Ok(Expression::Literal(Literal::False));
