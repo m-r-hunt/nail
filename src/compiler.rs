@@ -134,6 +134,8 @@ impl Compiler {
             parser::Expression::Block(b) => self.compile_block(b),
             parser::Expression::Call(c) => self.compile_call(c),
             parser::Expression::If(i) => self.compile_if(i),
+            parser::Expression::While(w) => self.compile_while(w),
+            parser::Expression::Assignment(a) => self.compile_assignment(a),
         }
     }
 
@@ -207,6 +209,11 @@ impl Compiler {
         }
     }
 
+    fn insert_jump_address(&mut self, jump_target_address: usize, dest_address: usize) {
+        let addr = (dest_address as isize - jump_target_address as isize - 1) as i8;
+        self.chunk.code[jump_target_address] = addr as u8;
+    }
+
     fn compile_if(&mut self, if_expression: parser::If) {
         self.compile_expression(*if_expression.condition);
         self.chunk.write_chunk(OpCode::JumpIfFalse as u8, 1);
@@ -216,13 +223,36 @@ impl Compiler {
         self.chunk.write_chunk(OpCode::Jump as u8, 1);
         self.chunk.write_chunk(0, 1);
         let else_target_address = self.chunk.code.len() - 1;
-        self.chunk.code[jump_target_address] =
-            (self.chunk.code.len() - jump_target_address - 1) as u8;
+        let addr = self.chunk.code.len();
+        self.insert_jump_address(jump_target_address, addr);
         match if_expression.else_block {
             Some(b) => self.compile_block(b),
             None => self.chunk.write_chunk(OpCode::PushNil as u8, 1),
         }
-        self.chunk.code[else_target_address] =
-            (self.chunk.code.len() - else_target_address - 1) as u8;
+        let addr = self.chunk.code.len();
+        self.insert_jump_address(else_target_address, addr);
+    }
+
+    fn compile_while(&mut self, while_expression: parser::While) {
+        let while_start_address = self.chunk.code.len();
+        self.compile_expression(*while_expression.condition);
+        self.chunk.write_chunk(OpCode::JumpIfFalse as u8, 1);
+        self.chunk.write_chunk(0, 1);
+        let jump_target_address = self.chunk.code.len() - 1;
+        self.compile_block(while_expression.block);
+        self.chunk.write_chunk(OpCode::Pop as u8, 1);
+        self.chunk.write_chunk(OpCode::Jump as u8, 1);
+        self.chunk.write_chunk(0, 1);
+        let current_address = self.chunk.code.len();
+        self.insert_jump_address(current_address-1, while_start_address);
+        self.insert_jump_address(jump_target_address, current_address);
+    }
+
+    fn compile_assignment(&mut self, assignment: parser::Assignment) {
+        self.compile_expression(*assignment.value);
+        self.chunk.write_chunk(OpCode::AssignLocal as u8, 1);
+        let local_number = self.find_local(&assignment.name).unwrap();
+        self.chunk.write_chunk(local_number, 1);
+        self.chunk.write_chunk(OpCode::PushNil as u8, 1);
     }
 }

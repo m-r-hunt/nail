@@ -180,15 +180,15 @@ impl VM {
                 }
 
                 Some(chunk::OpCode::JumpIfFalse) => {
-                    let target = self.read_byte();
+                    let target = self.read_signed_byte();
                     let value = self.pop();
                     if value.is_falsey() {
                         self.ip += target as usize;
                     }
                 }
                 Some(chunk::OpCode::Jump) => {
-                    let target = self.read_byte();
-                    self.ip += target as usize;
+                    let target = self.read_signed_byte() as isize;
+                    self.ip = (self.ip as isize + target) as usize;
                 }
 
                 Some(chunk::OpCode::TestLess) => binary_op!(self, <, Boolean),
@@ -208,6 +208,10 @@ impl VM {
     pub fn read_byte(&mut self) -> u8 {
         self.ip += 1;
         self.chunk.code[self.ip - 1]
+    }
+
+    pub fn read_signed_byte(&mut self) -> i8 {
+        self.read_byte() as i8
     }
 
     pub fn read_constant(&mut self) -> value::Value {

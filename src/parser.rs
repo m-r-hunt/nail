@@ -66,6 +66,12 @@ pub struct While {
 }
 
 #[derive(Debug)]
+pub struct Assignment {
+    pub name: String,
+    pub value: Box<Expression>,
+}
+
+#[derive(Debug)]
 pub enum Expression {
     Literal(Literal),
     Unary(Unary),
@@ -76,6 +82,7 @@ pub enum Expression {
     Call(Call),
     If(If),
     While(While),
+    Assignment(Assignment),
 }
 
 #[derive(Debug)]
@@ -194,7 +201,7 @@ impl Parser {
     }
 
     fn expression(&mut self) -> Result<Expression> {
-        return self.equality();
+        return self.assignment();
     }
 
     fn can_be_statement_without_semicolon(&self, expression: &Expression) -> bool {
@@ -248,6 +255,19 @@ impl Parser {
             statements,
             expression,
         });
+    }
+
+    fn assignment(&mut self) -> Result<Expression> {
+        let mut expr = self.equality()?;
+        while self.matches(&[TokenType::Equal])? {
+            let value = self.expression()?;
+            if let Expression::Variable(Variable{name}) = expr {
+                expr = Expression::Assignment(Assignment{name, value: Box::new(value)})
+            } else {
+                return Err(ParserError("Expected variable in assignment".to_string()));
+            }
+        }
+        return Ok(expr)
     }
 
     fn equality(&mut self) -> Result<Expression> {

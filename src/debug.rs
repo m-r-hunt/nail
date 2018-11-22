@@ -41,8 +41,8 @@ pub fn disassemble_instruction(chunk: &Chunk, offset: usize) -> usize {
         Some(OpCode::FunctionEntry) => number_instruction("OP_FN_ENTRY", &chunk, offset),
         Some(OpCode::Call) => number_instruction("OP_CALL", &chunk, offset),
 
-        Some(OpCode::JumpIfFalse) => number_instruction("OP_JUMP_IF_FALSE", &chunk, offset),
-        Some(OpCode::Jump) => number_instruction("OP_JUMP", &chunk, offset),
+        Some(OpCode::JumpIfFalse) => signed_number_instruction("OP_JUMP_IF_FALSE", &chunk, offset),
+        Some(OpCode::Jump) => signed_number_instruction("OP_JUMP", &chunk, offset),
 
         Some(OpCode::TestLess) => simple_instruction("OP_TEST_LESS", offset),
         Some(OpCode::TestLessOrEqual) => simple_instruction("OP_TEST_LESS_OR_EQUAL", offset),
@@ -75,3 +75,10 @@ fn number_instruction(name: &str, chunk: &Chunk, offset: usize) -> usize {
     println!("{} {}", name, number);
     return offset + 2;
 }
+
+fn signed_number_instruction(name: &str, chunk: &Chunk, offset: usize) -> usize {
+    let number = chunk.code[offset + 1];
+    println!("{} {}", name, number as i8);
+    return offset + 2;
+}
+
