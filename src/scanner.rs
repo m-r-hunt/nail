@@ -113,6 +113,7 @@ impl Scanner {
             '[' => Ok(self.make_token(TokenType::LeftBracket)),
             ']' => Ok(self.make_token(TokenType::RightBracket)),
             ';' => Ok(self.make_token(TokenType::Semicolon)),
+            ':' => Ok(self.make_token(TokenType::Colon)),
             ',' => Ok(self.make_token(TokenType::Comma)),
             '.' => Ok(self.make_token(TokenType::Dot)),
             '-' => Ok(self.make_token(TokenType::Minus)),
