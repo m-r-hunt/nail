@@ -61,6 +61,11 @@ pub fn disassemble_instruction(chunk: &Chunk, offset: usize) -> usize {
         Some(OpCode::MakeRange) => simple_instruction("OP_MAKE_RANGE", offset),
         Some(OpCode::ForLoop) => for_instruction(&chunk, offset),
 
+        Some(OpCode::Remainder) => simple_instruction("OP_REMAINDER", offset),
+
+        Some(OpCode::TestEqual) => simple_instruction("OP_TEST_EQUAL", offset),
+        Some(OpCode::TestNotEqual) => simple_instruction("OP_TEST_Not_EQUAL", offset),
+
         None => {
             println!("Unknown opcode {}", instr);
             offset + 1
@@ -95,8 +100,8 @@ fn signed_number_instruction(name: &str, chunk: &Chunk, offset: usize) -> usize 
 }
 
 fn for_instruction(chunk: &Chunk, offset: usize) -> usize {
-    let local = chunk.code[offset+1];
-    let jump_target = chunk.code[offset+2];
+    let local = chunk.code[offset + 1];
+    let jump_target = chunk.code[offset + 2];
     println!("OP_FOR_LOOP l={} jt={}", local, jump_target as i8);
-    return offset+3;
+    return offset + 3;
 }

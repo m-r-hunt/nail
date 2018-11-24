@@ -44,7 +44,9 @@ pub fn run_file(filename: &str) {
     let result = vm.interpret(&code);
     match result {
         Ok(_) => {}
-        Err(vm::InterpreterError::CompileError(_)) => return,
-        Err(vm::InterpreterError::RuntimeError(_)) => return,
+        Err(e) => {
+            println!("{}", e);
+            return;
+        }
     }
 }

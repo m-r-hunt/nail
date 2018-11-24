@@ -29,6 +29,7 @@ pub enum TokenType {
     Colon,
     Slash,
     Star,
+    Percent,
 
     Bang,
     BangEqual,
@@ -122,6 +123,7 @@ impl Scanner {
             '+' => Ok(self.make_token(TokenType::Plus)),
             '/' => Ok(self.make_token(TokenType::Slash)),
             '*' => Ok(self.make_token(TokenType::Star)),
+            '%' => Ok(self.make_token(TokenType::Percent)),
 
             '.' => {
                 let token_type = if self.token_match('.') {
@@ -227,7 +229,7 @@ impl Scanner {
                 }
                 '/' => {
                     if self.peek_next() == '/' {
-                        while self.peek() != '\n' && self.is_at_end() {
+                        while self.peek() != '\n' && !self.is_at_end() {
                             self.advance();
                         }
                     } else {

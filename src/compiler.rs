@@ -176,10 +176,13 @@ impl Compiler {
             TokenType::Minus => self.chunk.write_chunk(OpCode::Subtract as u8, 1),
             TokenType::Star => self.chunk.write_chunk(OpCode::Multiply as u8, 1),
             TokenType::Slash => self.chunk.write_chunk(OpCode::Divide as u8, 1),
+            TokenType::Percent => self.chunk.write_chunk(OpCode::Remainder as u8, 1),
             TokenType::Less => self.chunk.write_chunk(OpCode::TestLess as u8, 1),
             TokenType::LessEqual => self.chunk.write_chunk(OpCode::TestLessOrEqual as u8, 1),
             TokenType::Greater => self.chunk.write_chunk(OpCode::TestGreater as u8, 1),
             TokenType::GreaterEqual => self.chunk.write_chunk(OpCode::TestGreaterOrEqual as u8, 1),
+            TokenType::EqualEqual => self.chunk.write_chunk(OpCode::TestEqual as u8, 1),
+            TokenType::BangEqual => self.chunk.write_chunk(OpCode::TestNotEqual as u8, 1),
             _ => panic!("Unimplemented binary operator"),
         }
     }
@@ -266,7 +269,7 @@ impl Compiler {
         let local_n = self.bind_local(for_expression.variable);
         self.chunk.write_chunk(local_n, 1);
         self.chunk.write_chunk(0, 1);
-        let for_jump_target_address = self.chunk.code.len()-1;
+        let for_jump_target_address = self.chunk.code.len() - 1;
         self.compile_block(for_expression.block);
         self.chunk.write_chunk(OpCode::Pop as u8, 1);
         self.chunk.write_chunk(OpCode::Jump as u8, 1);

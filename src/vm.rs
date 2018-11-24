@@ -171,6 +171,7 @@ impl VM {
                 Some(chunk::OpCode::Subtract) => binary_op!(self, -, Number, Number),
                 Some(chunk::OpCode::Multiply) => binary_op!(self, *, Number, Number),
                 Some(chunk::OpCode::Divide) => binary_op!(self, /, Number, Number),
+                Some(chunk::OpCode::Remainder) => binary_op!(self, %, Number, Number),
 
                 Some(chunk::OpCode::Print) => println!("{}", self.pop()),
 
@@ -232,6 +233,8 @@ impl VM {
                 Some(chunk::OpCode::TestLessOrEqual) => binary_op!(self, <=, Number, Boolean),
                 Some(chunk::OpCode::TestGreater) => binary_op!(self, >, Number, Boolean),
                 Some(chunk::OpCode::TestGreaterOrEqual) => binary_op!(self, >=, Number, Boolean),
+                Some(chunk::OpCode::TestEqual) => binary_op!(self, ==, Number, Boolean),
+                Some(chunk::OpCode::TestNotEqual) => binary_op!(self, !=, Number, Boolean),
 
                 Some(chunk::OpCode::Index) => {
                     let the_value = self.pop();
@@ -372,17 +375,20 @@ impl VM {
                     match range {
                         value::Value::Range(l, r) => {
                             if l < r {
-                                self.locals[local_n as usize + self.locals_base] = value::Value::Number(l);
-                                self.push(value::Value::Range(l+1.0, r));
+                                self.locals[local_n as usize + self.locals_base] =
+                                    value::Value::Number(l);
+                                self.push(value::Value::Range(l + 1.0, r));
                             } else {
                                 self.ip = (self.ip as isize + jump_target as isize) as usize;
                             }
-                        },
-                        _ => return Err(InterpreterError::RuntimeError(
-                            "Don't know how to for over that".to_string(),
-                        )),
+                        }
+                        _ => {
+                            return Err(InterpreterError::RuntimeError(
+                                "Don't know how to for over that".to_string(),
+                            ))
+                        }
                     }
-                },
+                }
 
                 None => {
                     return Err(InterpreterError::RuntimeError(

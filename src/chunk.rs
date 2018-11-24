@@ -44,6 +44,11 @@ pub enum OpCode {
 
     MakeRange = 26,
     ForLoop = 27,
+
+    Remainder = 28,
+
+    TestEqual = 29,
+    TestNotEqual = 30,
 }
 
 impl OpCode {
@@ -90,6 +95,11 @@ impl OpCode {
 
             26 => Some(OpCode::MakeRange),
             27 => Some(OpCode::ForLoop),
+
+            28 => Some(OpCode::Remainder),
+
+            29 => Some(OpCode::TestEqual),
+            30 => Some(OpCode::TestNotEqual),
 
             _ => None,
         }

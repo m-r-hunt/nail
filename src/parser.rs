@@ -249,6 +249,9 @@ impl Parser {
     fn can_be_statement_without_semicolon(&self, expression: &Expression) -> bool {
         match expression {
             Expression::Block(_) => true,
+            Expression::For(_) => true,
+            Expression::While(_) => true,
+            Expression::If(_) => true,
             _ => false,
         }
     }
@@ -316,7 +319,12 @@ impl Parser {
                         value: Box::new(value),
                     })
                 }
-                _ => return Err(ParserError("Not a valid LValue in assignment".to_string())),
+                _ => {
+                    return Err(ParserError(
+                        "Not a valid LValue in assignment".to_string(),
+                        self.previous().line,
+                    ))
+                }
             }
         }
         return Ok(expr);
@@ -384,7 +392,7 @@ impl Parser {
 
     fn multiplication(&mut self) -> Result<Expression> {
         let mut expr = self.unary()?;
-        while self.matches(&[TokenType::Slash, TokenType::Star])? {
+        while self.matches(&[TokenType::Slash, TokenType::Star, TokenType::Percent])? {
             let operator = self.previous();
             let right = self.unary()?;
             expr = Expression::Binary(Binary {
@@ -504,7 +512,11 @@ impl Parser {
         self.consume(TokenType::In, "Expected 'in' in for loop.")?;
         let range = self.expression()?;
         let block = self.block()?;
-        return Ok(Expression::For(For{variable, range: Box::new(range), block}));
+        return Ok(Expression::For(For {
+            variable,
+            range: Box::new(range),
+            block,
+        }));
     }
 
     fn array(&mut self) -> Result<Expression> {
@@ -554,7 +566,10 @@ impl Parser {
             let s = self.scanner.get_lexeme(&t);
             return match s.parse::<f64>() {
                 Ok(f) => Ok(Expression::Literal(Literal::Number(f))),
-                Err(_) => Err(ParserError("Invalid number literal".to_string())),
+                Err(_) => Err(ParserError(
+                    "Invalid number literal".to_string(),
+                    self.previous().line,
+                )),
             };
         }
         if self.matches(&[TokenType::String])? {
@@ -575,7 +590,10 @@ impl Parser {
                 expression: Box::new(expression),
             }));
         }
-        return Err(ParserError("Expect expression".to_string()));
+        return Err(ParserError(
+            "Expect expression".to_string(),
+            self.peek().line,
+        ));
     }
 
     fn matches(&mut self, types: &[TokenType]) -> Result<bool> {
@@ -607,7 +625,7 @@ impl Parser {
         if self.check(token_type) {
             return self.advance();
         }
-        Err(ParserError(message.to_string()))
+        Err(ParserError(message.to_string(), self.peek().line))
     }
 
     fn is_at_end(&self) -> bool {

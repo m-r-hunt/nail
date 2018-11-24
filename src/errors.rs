@@ -1,7 +1,7 @@
 #[derive(Debug)]
 pub enum NotloxError {
     ScannerError(String),
-    ParserError(String),
+    ParserError(String, usize),
     CompilerError(String),
 }
 
@@ -13,7 +13,7 @@ impl std::fmt::Display for NotloxError {
             "{}",
             match self {
                 ScannerError(e) => format!("Scanner error: {}", e),
-                ParserError(e) => format!("Parser error: {}", e),
+                ParserError(e, n) => format!("Parser error: line({}): {}", n, e),
                 CompilerError(e) => format!("Compiler error: {}", e),
             }
         )
