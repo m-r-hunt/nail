@@ -66,8 +66,14 @@ pub struct While {
 }
 
 #[derive(Debug)]
+pub enum LValue {
+    Variable(Variable),
+    Index(Index),
+}
+
+#[derive(Debug)]
 pub struct Assignment {
-    pub name: String,
+    pub lvalue: LValue,
     pub value: Box<Expression>,
 }
 
@@ -274,13 +280,20 @@ impl Parser {
         let mut expr = self.equality()?;
         while self.matches(&[TokenType::Equal])? {
             let value = self.expression()?;
-            if let Expression::Variable(Variable { name }) = expr {
-                expr = Expression::Assignment(Assignment {
-                    name,
-                    value: Box::new(value),
-                })
-            } else {
-                return Err(ParserError("Expected variable in assignment".to_string()));
+            match expr {
+                Expression::Variable(v) => {
+                    expr = Expression::Assignment(Assignment {
+                        lvalue: LValue::Variable(v),
+                        value: Box::new(value),
+                    })
+                }
+                Expression::Index(i) => {
+                    expr = Expression::Assignment(Assignment {
+                        lvalue: LValue::Index(i),
+                        value: Box::new(value),
+                    })
+                }
+                _ => return Err(ParserError("Not a valid LValue in assignment".to_string())),
             }
         }
         return Ok(expr);

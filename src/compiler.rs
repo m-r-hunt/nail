@@ -256,10 +256,20 @@ impl Compiler {
     }
 
     fn compile_assignment(&mut self, assignment: parser::Assignment) {
-        self.compile_expression(*assignment.value);
-        self.chunk.write_chunk(OpCode::AssignLocal as u8, 1);
-        let local_number = self.find_local(&assignment.name).unwrap();
-        self.chunk.write_chunk(local_number, 1);
+        match assignment.lvalue {
+            parser::LValue::Variable(v) => {
+                self.compile_expression(*assignment.value);
+                self.chunk.write_chunk(OpCode::AssignLocal as u8, 1);
+                let local_number = self.find_local(&v.name).unwrap();
+                self.chunk.write_chunk(local_number, 1);
+            }
+            parser::LValue::Index(i) => {
+                self.compile_expression(*i.indexer);
+                self.compile_expression(*i.value);
+                self.compile_expression(*assignment.value);
+                self.chunk.write_chunk(OpCode::IndexAssign as u8, 1);
+            }
+        }
         self.chunk.write_chunk(OpCode::PushNil as u8, 1);
     }
 

@@ -37,6 +37,8 @@ pub enum OpCode {
 
     NewArray = 22,
     PushArray = 23,
+
+    IndexAssign = 24,
 }
 
 impl OpCode {
@@ -76,6 +78,8 @@ impl OpCode {
 
             22 => Some(OpCode::NewArray),
             23 => Some(OpCode::PushArray),
+
+            24 => Some(OpCode::IndexAssign),
 
             _ => None,
         }

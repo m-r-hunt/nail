@@ -279,6 +279,33 @@ impl VM {
                     }
                 }
 
+                Some(chunk::OpCode::IndexAssign) => {
+                    let new_value = self.pop();
+                    let index_value = self.pop();
+                    let indexer = self.pop();
+                    match indexer {
+                        value::Value::Array(a) => {
+                            let n;
+                            if let value::Value::Number(value) = index_value {
+                                n = value as usize;
+                            } else {
+                                return Err(InterpreterError::RuntimeError(
+                                    "Index must be number.".to_string(),
+                                ));
+                            }
+                            if n >= a.borrow().len() {
+                                a.borrow_mut().resize(n + 1, value::Value::Nil);
+                            }
+                            a.borrow_mut()[n] = new_value;
+                        }
+                        _ => {
+                            return Err(InterpreterError::RuntimeError(
+                                "Don't know how to index assign that".to_string(),
+                            ));
+                        }
+                    }
+                }
+
                 None => {
                     return Err(InterpreterError::RuntimeError(
                         "Bad instruction".to_string(),
