@@ -136,6 +136,7 @@ impl Compiler {
             parser::Expression::If(i) => self.compile_if(i),
             parser::Expression::While(w) => self.compile_while(w),
             parser::Expression::Assignment(a) => self.compile_assignment(a),
+            parser::Expression::Index(i) => self.compile_index(i),
         }
     }
 
@@ -143,6 +144,11 @@ impl Compiler {
         match literal {
             parser::Literal::Number(n) => {
                 let c = self.chunk.add_constant(value::Value::Number(n));
+                self.chunk.write_chunk(OpCode::Constant as u8, 1);
+                self.chunk.write_chunk(c, 1);
+            }
+            parser::Literal::String(s) => {
+                let c = self.chunk.add_constant(value::Value::String(s));
                 self.chunk.write_chunk(OpCode::Constant as u8, 1);
                 self.chunk.write_chunk(c, 1);
             }
@@ -244,7 +250,7 @@ impl Compiler {
         self.chunk.write_chunk(OpCode::Jump as u8, 1);
         self.chunk.write_chunk(0, 1);
         let current_address = self.chunk.code.len();
-        self.insert_jump_address(current_address-1, while_start_address);
+        self.insert_jump_address(current_address - 1, while_start_address);
         self.insert_jump_address(jump_target_address, current_address);
     }
 
@@ -254,5 +260,11 @@ impl Compiler {
         let local_number = self.find_local(&assignment.name).unwrap();
         self.chunk.write_chunk(local_number, 1);
         self.chunk.write_chunk(OpCode::PushNil as u8, 1);
+    }
+
+    fn compile_index(&mut self, index: parser::Index) {
+        self.compile_expression(*index.indexer);
+        self.compile_expression(*index.value);
+        self.chunk.write_chunk(OpCode::Index as u8, 1);
     }
 }

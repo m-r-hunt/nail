@@ -49,6 +49,8 @@ pub fn disassemble_instruction(chunk: &Chunk, offset: usize) -> usize {
         Some(OpCode::TestGreater) => simple_instruction("OP_TEST_GREATER", offset),
         Some(OpCode::TestGreaterOrEqual) => simple_instruction("OP_TEST_GREATER_OR_EQUAL", offset),
 
+        Some(OpCode::Index) => simple_instruction("OP_INDEX", offset),
+
         None => {
             println!("Unknown opcode {}", instr);
             offset + 1
@@ -81,4 +83,3 @@ fn signed_number_instruction(name: &str, chunk: &Chunk, offset: usize) -> usize 
     println!("{} {}", name, number as i8);
     return offset + 2;
 }
-

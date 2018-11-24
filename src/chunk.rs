@@ -32,6 +32,8 @@ pub enum OpCode {
     TestLessOrEqual = 18,
     TestGreater = 19,
     TestGreaterOrEqual = 20,
+
+    Index = 21,
 }
 
 impl OpCode {
@@ -66,6 +68,8 @@ impl OpCode {
             18 => Some(OpCode::TestLessOrEqual),
             19 => Some(OpCode::TestGreater),
             20 => Some(OpCode::TestGreaterOrEqual),
+
+            21 => Some(OpCode::Index),
 
             _ => None,
         }

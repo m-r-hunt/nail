@@ -16,6 +16,8 @@ pub struct Scanner {
 pub enum TokenType {
     LeftParen,
     RightParen,
+    LeftBracket,
+    RightBracket,
     LeftBrace,
     RightBrace,
     Comma,
@@ -108,6 +110,8 @@ impl Scanner {
             ')' => Ok(self.make_token(TokenType::RightParen)),
             '{' => Ok(self.make_token(TokenType::LeftBrace)),
             '}' => Ok(self.make_token(TokenType::RightBrace)),
+            '[' => Ok(self.make_token(TokenType::LeftBracket)),
+            ']' => Ok(self.make_token(TokenType::RightBracket)),
             ';' => Ok(self.make_token(TokenType::Semicolon)),
             ',' => Ok(self.make_token(TokenType::Comma)),
             '.' => Ok(self.make_token(TokenType::Dot)),

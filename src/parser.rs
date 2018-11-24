@@ -72,6 +72,12 @@ pub struct Assignment {
 }
 
 #[derive(Debug)]
+pub struct Index {
+    pub indexer: Box<Expression>,
+    pub value: Box<Expression>,
+}
+
+#[derive(Debug)]
 pub enum Expression {
     Literal(Literal),
     Unary(Unary),
@@ -83,6 +89,7 @@ pub enum Expression {
     If(If),
     While(While),
     Assignment(Assignment),
+    Index(Index),
 }
 
 #[derive(Debug)]
@@ -261,13 +268,16 @@ impl Parser {
         let mut expr = self.equality()?;
         while self.matches(&[TokenType::Equal])? {
             let value = self.expression()?;
-            if let Expression::Variable(Variable{name}) = expr {
-                expr = Expression::Assignment(Assignment{name, value: Box::new(value)})
+            if let Expression::Variable(Variable { name }) = expr {
+                expr = Expression::Assignment(Assignment {
+                    name,
+                    value: Box::new(value),
+                })
             } else {
                 return Err(ParserError("Expected variable in assignment".to_string()));
             }
         }
-        return Ok(expr)
+        return Ok(expr);
     }
 
     fn equality(&mut self) -> Result<Expression> {
@@ -340,7 +350,31 @@ impl Parser {
                 expression: Box::new(expression),
             }));
         }
-        return self.call();
+        return self.index();
+    }
+
+    fn index(&mut self) -> Result<Expression> {
+        let mut expression = self.call();
+
+        loop {
+            if self.matches(&[TokenType::LeftBracket])? {
+                expression = self.finish_index(expression?);
+            } else {
+                break;
+            }
+        }
+
+        return expression;
+    }
+
+    fn finish_index(&mut self, indexer: Expression) -> Result<Expression> {
+        let value = self.expression()?;
+        self.consume(TokenType::RightBracket, "Expected ']' after arguments.")?;
+
+        return Ok(Expression::Index(Index {
+            indexer: Box::new(indexer),
+            value: Box::new(value),
+        }));
     }
 
     fn call(&mut self) -> Result<Expression> {
