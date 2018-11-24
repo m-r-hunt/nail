@@ -22,6 +22,7 @@ pub enum TokenType {
     RightBrace,
     Comma,
     Dot,
+    DotDot,
     Minus,
     Plus,
     Semicolon,
@@ -115,11 +116,19 @@ impl Scanner {
             ';' => Ok(self.make_token(TokenType::Semicolon)),
             ':' => Ok(self.make_token(TokenType::Colon)),
             ',' => Ok(self.make_token(TokenType::Comma)),
-            '.' => Ok(self.make_token(TokenType::Dot)),
             '-' => Ok(self.make_token(TokenType::Minus)),
             '+' => Ok(self.make_token(TokenType::Plus)),
             '/' => Ok(self.make_token(TokenType::Slash)),
             '*' => Ok(self.make_token(TokenType::Star)),
+
+            '.' => {
+                let token_type = if self.token_match('.') {
+                    TokenType::DotDot
+                } else {
+                    TokenType::Dot
+                };
+                Ok(self.make_token(token_type))
+            }
 
             '!' => {
                 let token_type = if self.token_match('=') {
