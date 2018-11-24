@@ -369,15 +369,17 @@ impl Parser {
                 expression: Box::new(expression),
             }));
         }
-        return self.index();
+        return self.unary_postfix();
     }
 
-    fn index(&mut self) -> Result<Expression> {
-        let mut expression = self.call();
+    fn unary_postfix(&mut self) -> Result<Expression> {
+        let mut expression = self.primary();
 
         loop {
             if self.matches(&[TokenType::LeftBracket])? {
                 expression = self.finish_index(expression?);
+            } else if self.matches(&[TokenType::LeftParen])? {
+                expression = self.finish_call(expression?);
             } else {
                 break;
             }
@@ -394,20 +396,6 @@ impl Parser {
             indexer: Box::new(indexer),
             value: Box::new(value),
         }));
-    }
-
-    fn call(&mut self) -> Result<Expression> {
-        let mut expression = self.primary();
-
-        loop {
-            if self.matches(&[TokenType::LeftParen])? {
-                expression = self.finish_call(expression?);
-            } else {
-                break;
-            }
-        }
-
-        return expression;
     }
 
     fn finish_call(&mut self, callee: Expression) -> Result<Expression> {
