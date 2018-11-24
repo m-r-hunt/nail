@@ -1,4 +1,6 @@
 use super::{chunk, compiler, debug, errors::NotloxError, value};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 const STACK_SIZE: usize = 256;
 
@@ -248,9 +250,31 @@ impl VM {
                         // Todo: Make this better and maybe utf8 safe.
                         let c = s.into_bytes()[v];
                         self.push(value::Value::Number(c as f64));
+                    } else if let value::Value::Array(a) = indexer {
+                        if v >= a.borrow().len() {
+                            a.borrow_mut().resize(v + 1, value::Value::Nil);
+                        }
+                        self.push(a.borrow()[v].clone());
                     } else {
                         return Err(InterpreterError::RuntimeError(
                             "Don't know how to index that.".to_string(),
+                        ));
+                    }
+                }
+
+                Some(chunk::OpCode::NewArray) => {
+                    self.push(value::Value::Array(Rc::new(RefCell::new(Vec::new()))));
+                }
+
+                Some(chunk::OpCode::PushArray) => {
+                    let value = self.pop();
+                    let array = self.pop();
+                    if let value::Value::Array(a) = array {
+                        a.borrow_mut().push(value);
+                        self.push(value::Value::Array(a));
+                    } else {
+                        return Err(InterpreterError::RuntimeError(
+                            "Array push on non-array".to_string(),
                         ));
                     }
                 }

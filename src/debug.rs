@@ -51,6 +51,9 @@ pub fn disassemble_instruction(chunk: &Chunk, offset: usize) -> usize {
 
         Some(OpCode::Index) => simple_instruction("OP_INDEX", offset),
 
+        Some(OpCode::NewArray) => simple_instruction("OP_NEW_ARRAY", offset),
+        Some(OpCode::PushArray) => simple_instruction("OP_PUSH_ARRAY", offset),
+
         None => {
             println!("Unknown opcode {}", instr);
             offset + 1

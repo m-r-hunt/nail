@@ -137,6 +137,7 @@ impl Compiler {
             parser::Expression::While(w) => self.compile_while(w),
             parser::Expression::Assignment(a) => self.compile_assignment(a),
             parser::Expression::Index(i) => self.compile_index(i),
+            parser::Expression::Array(a) => self.compile_array(a),
         }
     }
 
@@ -266,5 +267,13 @@ impl Compiler {
         self.compile_expression(*index.indexer);
         self.compile_expression(*index.value);
         self.chunk.write_chunk(OpCode::Index as u8, 1);
+    }
+
+    fn compile_array(&mut self, array: parser::Array) {
+        self.chunk.write_chunk(OpCode::NewArray as u8, 1);
+        for e in array.initializers {
+            self.compile_expression(e);
+            self.chunk.write_chunk(OpCode::PushArray as u8, 1);
+        }
     }
 }

@@ -78,6 +78,11 @@ pub struct Index {
 }
 
 #[derive(Debug)]
+pub struct Array {
+    pub initializers: Vec<Expression>,
+}
+
+#[derive(Debug)]
 pub enum Expression {
     Literal(Literal),
     Unary(Unary),
@@ -90,6 +95,7 @@ pub enum Expression {
     While(While),
     Assignment(Assignment),
     Index(Index),
+    Array(Array),
 }
 
 #[derive(Debug)]
@@ -430,9 +436,29 @@ impl Parser {
         return Ok(Expression::While(While { condition, block }));
     }
 
+    fn array(&mut self) -> Result<Expression> {
+        let mut out = Array {
+            initializers: Vec::new(),
+        };
+        loop {
+            if self.check(TokenType::RightBracket) {
+                break;
+            }
+            out.initializers.push(self.expression()?);
+            if !self.matches(&[TokenType::Comma])? {
+                break;
+            }
+        }
+        self.consume(TokenType::RightBracket, "Expected ']' to close array.")?;
+        return Ok(Expression::Array(out));
+    }
+
     fn primary(&mut self) -> Result<Expression> {
         if self.peek().token_type == TokenType::LeftBrace {
             return Ok(Expression::Block(self.block()?));
+        }
+        if self.matches(&[TokenType::LeftBracket])? {
+            return self.array();
         }
         if self.matches(&[TokenType::If])? {
             return self.if_expression();

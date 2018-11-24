@@ -1,9 +1,13 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
 #[derive(Clone, Debug)]
 pub enum Value {
     Nil,
     Number(f64),
     Boolean(bool),
     String(String),
+    Array(Rc<RefCell<Vec<Value>>>),
 }
 
 impl std::fmt::Display for Value {
@@ -13,6 +17,7 @@ impl std::fmt::Display for Value {
             Value::Number(n) => write!(f, "{}", n),
             Value::Boolean(b) => write!(f, "{}", b),
             Value::String(s) => write!(f, "{}", s),
+            Value::Array(a) => write!(f, "Array({:p})", a),
         }
     }
 }

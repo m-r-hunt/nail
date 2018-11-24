@@ -34,6 +34,9 @@ pub enum OpCode {
     TestGreaterOrEqual = 20,
 
     Index = 21,
+
+    NewArray = 22,
+    PushArray = 23,
 }
 
 impl OpCode {
@@ -70,6 +73,9 @@ impl OpCode {
             20 => Some(OpCode::TestGreaterOrEqual),
 
             21 => Some(OpCode::Index),
+
+            22 => Some(OpCode::NewArray),
+            23 => Some(OpCode::PushArray),
 
             _ => None,
         }
