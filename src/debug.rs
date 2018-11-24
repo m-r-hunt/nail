@@ -56,6 +56,8 @@ pub fn disassemble_instruction(chunk: &Chunk, offset: usize) -> usize {
 
         Some(OpCode::IndexAssign) => simple_instruction("OP_INDEX_ASSIGN", offset),
 
+        Some(OpCode::BuiltinCall) => simple_instruction("OP_BUILTIN_CALL", offset),
+
         None => {
             println!("Unknown opcode {}", instr);
             offset + 1

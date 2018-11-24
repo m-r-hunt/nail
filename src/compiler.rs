@@ -138,6 +138,7 @@ impl Compiler {
             parser::Expression::Assignment(a) => self.compile_assignment(a),
             parser::Expression::Index(i) => self.compile_index(i),
             parser::Expression::Array(a) => self.compile_array(a),
+            parser::Expression::BuiltinCall(c) => self.compile_builtin_call(c),
         }
     }
 
@@ -285,5 +286,18 @@ impl Compiler {
             self.compile_expression(e);
             self.chunk.write_chunk(OpCode::PushArray as u8, 1);
         }
+    }
+
+    fn compile_builtin_call(&mut self, builtin_call: parser::BuiltinCall) {
+        for e in builtin_call.args {
+            self.compile_expression(e);
+        }
+        self.compile_expression(*builtin_call.callee);
+        let c = self
+            .chunk
+            .add_constant(value::Value::String(builtin_call.name));
+        self.chunk.write_chunk(OpCode::Constant as u8, 1);
+        self.chunk.write_chunk(c, 1);
+        self.chunk.write_chunk(OpCode::BuiltinCall as u8, 1);
     }
 }

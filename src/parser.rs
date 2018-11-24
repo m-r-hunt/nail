@@ -53,6 +53,13 @@ pub struct Call {
 }
 
 #[derive(Debug)]
+pub struct BuiltinCall {
+    pub callee: Box<Expression>,
+    pub name: String,
+    pub args: Vec<Expression>,
+}
+
+#[derive(Debug)]
 pub struct If {
     pub condition: Box<Expression>,
     pub then_block: Block,
@@ -102,6 +109,7 @@ pub enum Expression {
     Assignment(Assignment),
     Index(Index),
     Array(Array),
+    BuiltinCall(BuiltinCall),
 }
 
 #[derive(Debug)]
@@ -380,6 +388,8 @@ impl Parser {
                 expression = self.finish_index(expression?);
             } else if self.matches(&[TokenType::LeftParen])? {
                 expression = self.finish_call(expression?);
+            } else if self.matches(&[TokenType::Colon])? {
+                expression = self.finish_builtin_call(expression?);
             } else {
                 break;
             }
@@ -413,6 +423,29 @@ impl Parser {
 
         return Ok(Expression::Call(Call {
             callee: Box::new(callee),
+            args,
+        }));
+    }
+
+    fn finish_builtin_call(&mut self, callee: Expression) -> Result<Expression> {
+        let name = self.consume(TokenType::Identifier, "Expected builtin name.")?;
+
+        self.consume(TokenType::LeftParen, "Expected '(' to start arguments.")?;
+        let mut args = Vec::new();
+        if !self.check(TokenType::RightParen) {
+            loop {
+                args.push(self.expression()?);
+                if !self.matches(&[TokenType::Comma])? {
+                    break;
+                }
+            }
+        }
+
+        self.consume(TokenType::RightParen, "Expected ')' after arguments.")?;
+        let name = self.scanner.get_lexeme(&name);
+        return Ok(Expression::BuiltinCall(BuiltinCall {
+            callee: Box::new(callee),
+            name,
             args,
         }));
     }

@@ -306,6 +306,47 @@ impl VM {
                     }
                 }
 
+                Some(chunk::OpCode::BuiltinCall) => {
+                    let builtin = self.pop();
+                    let callee = self.pop();
+                    let builtin = if let value::Value::String(s) = builtin {
+                        s
+                    } else {
+                        return Err(InterpreterError::RuntimeError(
+                            "Expected builtin name".to_string(),
+                        ));
+                    };
+
+                    // TODO: Some kind of data driven solution rather than hardcoded ifs.
+                    match callee {
+                        value::Value::Array(a) => {
+                            if builtin == "len" {
+                                self.push(value::Value::Number(a.borrow().len() as f64));
+                            } else {
+                                return Err(InterpreterError::RuntimeError(
+                                    "Unknown array builtin".to_string(),
+                                ));
+                            }
+                        }
+
+                        value::Value::String(s) => {
+                            if builtin == "len" {
+                                self.push(value::Value::Number(s.len() as f64));
+                            } else {
+                                return Err(InterpreterError::RuntimeError(
+                                    "Unknown string builtin".to_string(),
+                                ));
+                            }
+                        }
+
+                        _ => {
+                            return Err(InterpreterError::RuntimeError(
+                                "Unknown builtin".to_string(),
+                            ))
+                        }
+                    }
+                }
+
                 None => {
                     return Err(InterpreterError::RuntimeError(
                         "Bad instruction".to_string(),
