@@ -50,6 +50,7 @@ pub enum TokenType {
     Fn,
     For,
     If,
+    In,
     Nil,
     Or,
     Print,
@@ -80,6 +81,7 @@ impl Scanner {
         kw_map.insert("for".to_string(), TokenType::For);
         kw_map.insert("fn".to_string(), TokenType::Fn);
         kw_map.insert("if".to_string(), TokenType::If);
+        kw_map.insert("in".to_string(), TokenType::In);
         kw_map.insert("nil".to_string(), TokenType::Nil);
         kw_map.insert("or".to_string(), TokenType::Or);
         kw_map.insert("print".to_string(), TokenType::Print);

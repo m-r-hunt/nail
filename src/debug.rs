@@ -58,6 +58,9 @@ pub fn disassemble_instruction(chunk: &Chunk, offset: usize) -> usize {
 
         Some(OpCode::BuiltinCall) => simple_instruction("OP_BUILTIN_CALL", offset),
 
+        Some(OpCode::MakeRange) => simple_instruction("OP_MAKE_RANGE", offset),
+        Some(OpCode::ForLoop) => for_instruction(&chunk, offset),
+
         None => {
             println!("Unknown opcode {}", instr);
             offset + 1
@@ -89,4 +92,11 @@ fn signed_number_instruction(name: &str, chunk: &Chunk, offset: usize) -> usize 
     let number = chunk.code[offset + 1];
     println!("{} {}", name, number as i8);
     return offset + 2;
+}
+
+fn for_instruction(chunk: &Chunk, offset: usize) -> usize {
+    let local = chunk.code[offset+1];
+    let jump_target = chunk.code[offset+2];
+    println!("OP_FOR_LOOP l={} jt={}", local, jump_target as i8);
+    return offset+3;
 }

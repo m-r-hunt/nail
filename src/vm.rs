@@ -347,6 +347,43 @@ impl VM {
                     }
                 }
 
+                Some(chunk::OpCode::MakeRange) => {
+                    let right = if let value::Value::Number(n) = self.pop() {
+                        n
+                    } else {
+                        return Err(InterpreterError::RuntimeError(
+                            "Expected number in range bounds".to_string(),
+                        ));
+                    };
+                    let left = if let value::Value::Number(n) = self.pop() {
+                        n
+                    } else {
+                        return Err(InterpreterError::RuntimeError(
+                            "Expected number in range bounds".to_string(),
+                        ));
+                    };
+                    self.push(value::Value::Range(left, right))
+                }
+
+                Some(chunk::OpCode::ForLoop) => {
+                    let local_n = self.read_byte();
+                    let jump_target = self.read_signed_byte();
+                    let range = self.pop();
+                    match range {
+                        value::Value::Range(l, r) => {
+                            if l < r {
+                                self.locals[local_n as usize + self.locals_base] = value::Value::Number(l);
+                                self.push(value::Value::Range(l+1.0, r));
+                            } else {
+                                self.ip = (self.ip as isize + jump_target as isize) as usize;
+                            }
+                        },
+                        _ => return Err(InterpreterError::RuntimeError(
+                            "Don't know how to for over that".to_string(),
+                        )),
+                    }
+                },
+
                 None => {
                     return Err(InterpreterError::RuntimeError(
                         "Bad instruction".to_string(),

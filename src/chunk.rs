@@ -41,6 +41,9 @@ pub enum OpCode {
     IndexAssign = 24,
 
     BuiltinCall = 25,
+
+    MakeRange = 26,
+    ForLoop = 27,
 }
 
 impl OpCode {
@@ -84,6 +87,9 @@ impl OpCode {
             24 => Some(OpCode::IndexAssign),
 
             25 => Some(OpCode::BuiltinCall),
+
+            26 => Some(OpCode::MakeRange),
+            27 => Some(OpCode::ForLoop),
 
             _ => None,
         }

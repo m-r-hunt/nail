@@ -135,10 +135,12 @@ impl Compiler {
             parser::Expression::Call(c) => self.compile_call(c),
             parser::Expression::If(i) => self.compile_if(i),
             parser::Expression::While(w) => self.compile_while(w),
+            parser::Expression::For(f) => self.compile_for(f),
             parser::Expression::Assignment(a) => self.compile_assignment(a),
             parser::Expression::Index(i) => self.compile_index(i),
             parser::Expression::Array(a) => self.compile_array(a),
             parser::Expression::BuiltinCall(c) => self.compile_builtin_call(c),
+            parser::Expression::Range(r) => self.compile_range(r),
         }
     }
 
@@ -254,6 +256,25 @@ impl Compiler {
         let current_address = self.chunk.code.len();
         self.insert_jump_address(current_address - 1, while_start_address);
         self.insert_jump_address(jump_target_address, current_address);
+        self.chunk.write_chunk(OpCode::PushNil as u8, 1);
+    }
+
+    fn compile_for(&mut self, for_expression: parser::For) {
+        self.compile_expression(*for_expression.range);
+        let for_start_address = self.chunk.code.len();
+        self.chunk.write_chunk(OpCode::ForLoop as u8, 1);
+        let local_n = self.bind_local(for_expression.variable);
+        self.chunk.write_chunk(local_n, 1);
+        self.chunk.write_chunk(0, 1);
+        let for_jump_target_address = self.chunk.code.len()-1;
+        self.compile_block(for_expression.block);
+        self.chunk.write_chunk(OpCode::Pop as u8, 1);
+        self.chunk.write_chunk(OpCode::Jump as u8, 1);
+        self.chunk.write_chunk(0, 1);
+        let current_address = self.chunk.code.len();
+        self.insert_jump_address(current_address - 1, for_start_address);
+        self.insert_jump_address(for_jump_target_address, current_address);
+        self.chunk.write_chunk(OpCode::PushNil as u8, 1);
     }
 
     fn compile_assignment(&mut self, assignment: parser::Assignment) {
@@ -299,5 +320,11 @@ impl Compiler {
         self.chunk.write_chunk(OpCode::Constant as u8, 1);
         self.chunk.write_chunk(c, 1);
         self.chunk.write_chunk(OpCode::BuiltinCall as u8, 1);
+    }
+
+    fn compile_range(&mut self, range: parser::Range) {
+        self.compile_expression(*range.left);
+        self.compile_expression(*range.right);
+        self.chunk.write_chunk(OpCode::MakeRange as u8, 1);
     }
 }

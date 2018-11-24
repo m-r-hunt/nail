@@ -8,6 +8,7 @@ pub enum Value {
     Boolean(bool),
     String(String),
     Array(Rc<RefCell<Vec<Value>>>),
+    Range(f64, f64),
 }
 
 impl std::fmt::Display for Value {
@@ -18,6 +19,7 @@ impl std::fmt::Display for Value {
             Value::Boolean(b) => write!(f, "{}", b),
             Value::String(s) => write!(f, "{}", s),
             Value::Array(a) => write!(f, "Array({:p})", a),
+            Value::Range(l, r) => write!(f, "{}..{}", l, r),
         }
     }
 }

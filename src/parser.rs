@@ -73,6 +73,13 @@ pub struct While {
 }
 
 #[derive(Debug)]
+pub struct For {
+    pub variable: String,
+    pub range: Box<Expression>,
+    pub block: Block,
+}
+
+#[derive(Debug)]
 pub enum LValue {
     Variable(Variable),
     Index(Index),
@@ -96,6 +103,12 @@ pub struct Array {
 }
 
 #[derive(Debug)]
+pub struct Range {
+    pub left: Box<Expression>,
+    pub right: Box<Expression>,
+}
+
+#[derive(Debug)]
 pub enum Expression {
     Literal(Literal),
     Unary(Unary),
@@ -106,10 +119,12 @@ pub enum Expression {
     Call(Call),
     If(If),
     While(While),
+    For(For),
     Assignment(Assignment),
     Index(Index),
     Array(Array),
     BuiltinCall(BuiltinCall),
+    Range(Range),
 }
 
 #[derive(Debug)]
@@ -322,7 +337,7 @@ impl Parser {
     }
 
     fn comparison(&mut self) -> Result<Expression> {
-        let mut expr = self.addition()?;
+        let mut expr = self.range()?;
         while self.matches(&[
             TokenType::Greater,
             TokenType::GreaterEqual,
@@ -330,13 +345,26 @@ impl Parser {
             TokenType::LessEqual,
         ])? {
             let operator = self.previous();
-            let right = self.addition()?;
+            let right = self.range()?;
             expr = Expression::Binary(Binary {
                 left: Box::new(expr),
                 operator,
                 right: Box::new(right),
             });
         }
+        return Ok(expr);
+    }
+
+    fn range(&mut self) -> Result<Expression> {
+        let mut expr = self.addition()?;
+        if self.matches(&[TokenType::DotDot])? {
+            let right = self.addition()?;
+            expr = Expression::Range(Range {
+                left: Box::new(expr),
+                right: Box::new(right),
+            });
+        }
+
         return Ok(expr);
     }
 
@@ -470,6 +498,15 @@ impl Parser {
         return Ok(Expression::While(While { condition, block }));
     }
 
+    fn for_expression(&mut self) -> Result<Expression> {
+        let variable = self.consume(TokenType::Identifier, "Expected identifier in for loop")?;
+        let variable = self.scanner.get_lexeme(&variable);
+        self.consume(TokenType::In, "Expected 'in' in for loop.")?;
+        let range = self.expression()?;
+        let block = self.block()?;
+        return Ok(Expression::For(For{variable, range: Box::new(range), block}));
+    }
+
     fn array(&mut self) -> Result<Expression> {
         let mut out = Array {
             initializers: Vec::new(),
@@ -499,6 +536,9 @@ impl Parser {
         }
         if self.matches(&[TokenType::While])? {
             return self.while_expression();
+        }
+        if self.matches(&[TokenType::For])? {
+            return self.for_expression();
         }
         if self.matches(&[TokenType::False])? {
             return Ok(Expression::Literal(Literal::False));
