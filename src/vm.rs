@@ -382,6 +382,15 @@ impl VM {
                                 self.ip = (self.ip as isize + jump_target as isize) as usize;
                             }
                         }
+                        value::Value::Array(a) => {
+                            if a.borrow().len() > 0 {
+                                self.locals[local_n as usize + self.locals_base] =
+                                    value::Value::Number(0.0);
+                                self.push(value::Value::Range(1.0, a.borrow().len() as f64));
+                            } else {
+                                self.ip = (self.ip as isize + jump_target as isize) as usize;
+                            }
+                        },
                         _ => {
                             return Err(InterpreterError::RuntimeError(
                                 "Don't know how to for over that".to_string(),
