@@ -46,6 +46,8 @@ pub enum TokenType {
     Number,
 
     And,
+    Break,
+    Continue,
     Else,
     False,
     Fn,
@@ -77,6 +79,8 @@ impl Scanner {
     pub fn new(source: &str) -> Scanner {
         let mut kw_map = std::collections::HashMap::new();
         kw_map.insert("and".to_string(), TokenType::And);
+        kw_map.insert("break".to_string(), TokenType::Break);
+        kw_map.insert("continue".to_string(), TokenType::Continue);
         kw_map.insert("else".to_string(), TokenType::Else);
         kw_map.insert("false".to_string(), TokenType::False);
         kw_map.insert("for".to_string(), TokenType::For);

@@ -390,7 +390,7 @@ impl VM {
                             } else {
                                 self.ip = (self.ip as isize + jump_target as isize) as usize;
                             }
-                        },
+                        }
                         _ => {
                             return Err(InterpreterError::RuntimeError(
                                 "Don't know how to for over that".to_string(),

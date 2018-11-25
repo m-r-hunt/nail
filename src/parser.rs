@@ -131,6 +131,8 @@ pub enum Expression {
     BuiltinCall(BuiltinCall),
     Range(Range),
     Return(Return),
+    Break,
+    Continue,
 }
 
 #[derive(Debug)]
@@ -569,6 +571,12 @@ impl Parser {
         }
         if self.matches(&[TokenType::Return])? {
             return self.return_expression();
+        }
+        if self.matches(&[TokenType::Break])? {
+            return Ok(Expression::Break);
+        }
+        if self.matches(&[TokenType::Continue])? {
+            return Ok(Expression::Continue);
         }
         if self.matches(&[TokenType::False])? {
             return Ok(Expression::Literal(Literal::False));
