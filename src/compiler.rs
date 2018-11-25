@@ -331,7 +331,7 @@ impl Compiler {
         self.compile_expression(*index.indexer);
         self.compile_expression(*index.value);
         self.chunk.write_chunk(OpCode::Index as u8, 1);
-        self.pushed_this_fn -= 2;
+        self.pushed_this_fn -= 1;
     }
 
     fn compile_array(&mut self, array: parser::Array) {
