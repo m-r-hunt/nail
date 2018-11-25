@@ -54,6 +54,9 @@ pub enum OpCode {
 
     PushTrue = 32,
     PushFalse = 33,
+
+    NewMap = 34,
+    PushMap = 35,
 }
 
 impl OpCode {
@@ -110,6 +113,9 @@ impl OpCode {
 
             32 => Some(OpCode::PushTrue),
             33 => Some(OpCode::PushFalse),
+
+            34 => Some(OpCode::NewMap),
+            35 => Some(OpCode::PushMap),
 
             _ => None,
         }

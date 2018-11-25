@@ -238,30 +238,46 @@ impl VM {
 
                 Some(chunk::OpCode::Index) => {
                     let the_value = self.pop();
-
-                    let v;
-                    if let value::Value::Number(n) = the_value {
-                        v = n as usize;
-                    } else {
-                        return Err(InterpreterError::RuntimeError(
-                            "Index must be number.".to_string(),
-                        ));
-                    }
-
                     let indexer = self.pop();
-                    if let value::Value::String(s) = indexer {
-                        // Todo: Make this better and maybe utf8 safe.
-                        let c = s.into_bytes()[v];
-                        self.push(value::Value::Number(c as f64));
-                    } else if let value::Value::Array(a) = indexer {
-                        if v >= a.borrow().len() {
-                            a.borrow_mut().resize(v + 1, value::Value::Nil);
+                    match indexer {
+                        value::Value::String(s) => {
+                            let v;
+                            if let value::Value::Number(n) = the_value {
+                                v = n as usize;
+                            } else {
+                                return Err(InterpreterError::RuntimeError(
+                                    "Index must be number.".to_string(),
+                                ));
+                            }
+                            // Todo: Make this better and maybe utf8 safe.
+                            let c = s.into_bytes()[v];
+                            self.push(value::Value::Number(c as f64));
                         }
-                        self.push(a.borrow()[v].clone());
-                    } else {
-                        return Err(InterpreterError::RuntimeError(
-                            "Don't know how to index that.".to_string(),
-                        ));
+
+                        value::Value::Array(a) => {
+                            let v;
+                            if let value::Value::Number(n) = the_value {
+                                v = n as usize;
+                            } else {
+                                return Err(InterpreterError::RuntimeError(
+                                    "Index must be number.".to_string(),
+                                ));
+                            }
+                            if v >= a.borrow().len() {
+                                a.borrow_mut().resize(v + 1, value::Value::Nil);
+                            }
+                            self.push(a.borrow()[v].clone());
+                        }
+
+                        value::Value::Map(m) => {
+                            self.push(m.borrow().lookup(the_value));
+                        }
+
+                        _ => {
+                            return Err(InterpreterError::RuntimeError(
+                                "Don't know how to index that.".to_string(),
+                            ));
+                        }
                     }
                 }
 
@@ -301,6 +317,11 @@ impl VM {
                             }
                             a.borrow_mut()[n] = new_value;
                         }
+
+                        value::Value::Map(m) => {
+                            m.borrow_mut().insert(index_value, new_value);
+                        }
+
                         _ => {
                             return Err(InterpreterError::RuntimeError(
                                 "Don't know how to index assign that".to_string(),
@@ -410,6 +431,26 @@ impl VM {
 
                 Some(chunk::OpCode::PushFalse) => {
                     self.push(value::Value::Boolean(false));
+                }
+
+                Some(chunk::OpCode::NewMap) => {
+                    self.push(value::Value::Map(Rc::new(RefCell::new(
+                        value::ShittyMap::new(),
+                    ))));
+                }
+
+                Some(chunk::OpCode::PushMap) => {
+                    let value = self.pop();
+                    let key = self.pop();
+                    let map = self.pop();
+                    if let value::Value::Map(m) = map {
+                        m.borrow_mut().insert(key, value);
+                        self.push(value::Value::Map(m));
+                    } else {
+                        return Err(InterpreterError::RuntimeError(
+                            "Map push on non-map".to_string(),
+                        ));
+                    }
                 }
 
                 None => {

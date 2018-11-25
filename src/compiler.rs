@@ -187,6 +187,7 @@ impl Compiler {
             parser::Expression::CompoundAssignment(ca) => self.compile_compound_assignment(ca),
             parser::Expression::Index(i) => self.compile_index(i),
             parser::Expression::Array(a) => self.compile_array(a),
+            parser::Expression::Map(m) => self.compile_map(m),
             parser::Expression::BuiltinCall(c) => self.compile_builtin_call(c),
             parser::Expression::Range(r) => self.compile_range(r),
             parser::Expression::Return(r) => self.compile_return(r),
@@ -450,6 +451,22 @@ impl Compiler {
             self.compile_expression(e);
             self.chunk.write_chunk(OpCode::PushArray as u8, 1);
             self.adjust_stack_usage(-1);
+        }
+    }
+
+    fn compile_map(&mut self, map: parser::Map) {
+        self.chunk.write_chunk(OpCode::NewMap as u8, 1);
+        self.adjust_stack_usage(1);
+        for i in map.initializers {
+            let c = self.chunk.add_constant(value::Value::String(i.name));
+            self.chunk.write_chunk(OpCode::Constant as u8, 1);
+            self.chunk.write_chunk(c, 1);
+            self.adjust_stack_usage(1);
+
+            self.compile_expression(*i.value);
+
+            self.chunk.write_chunk(OpCode::PushMap as u8, 1);
+            self.adjust_stack_usage(-2);
         }
     }
 

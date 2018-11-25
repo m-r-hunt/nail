@@ -116,6 +116,17 @@ pub struct Array {
 }
 
 #[derive(Debug, Clone)]
+pub struct MapInitializer {
+    pub name: String,
+    pub value: Box<Expression>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Map {
+    pub initializers: Vec<MapInitializer>,
+}
+
+#[derive(Debug, Clone)]
 pub struct Range {
     pub left: Box<Expression>,
     pub right: Box<Expression>,
@@ -143,6 +154,7 @@ pub enum Expression {
     CompoundAssignment(CompoundAssignment),
     Index(Index),
     Array(Array),
+    Map(Map),
     BuiltinCall(BuiltinCall),
     Range(Range),
     Return(Return),
@@ -609,12 +621,42 @@ impl Parser {
         return Ok(Expression::Array(out));
     }
 
+    fn map(&mut self) -> Result<Expression> {
+        let mut out = Map {
+            initializers: Vec::new(),
+        };
+        loop {
+            if self.check(TokenType::RightBrace) {
+                break;
+            }
+            let name_t = self.consume(
+                TokenType::Identifier,
+                "Expected identifier in map initializer",
+            )?;
+            let name = self.scanner.get_lexeme(&name_t);
+            self.consume(TokenType::Colon, "Expected ':' in map initializer")?;
+            let value = self.expression()?;
+            out.initializers.push(MapInitializer {
+                name,
+                value: Box::new(value),
+            });
+            if !self.matches(&[TokenType::Comma])? {
+                break;
+            }
+        }
+        self.consume(TokenType::RightBrace, "Expected '}' to end map expression")?;
+        return Ok(Expression::Map(out));
+    }
+
     fn primary(&mut self) -> Result<Expression> {
         if self.peek().token_type == TokenType::LeftBrace {
             return Ok(Expression::Block(self.block()?));
         }
         if self.matches(&[TokenType::LeftBracket])? {
             return self.array();
+        }
+        if self.matches(&[TokenType::HashLeftBrace])? {
+            return self.map();
         }
         if self.matches(&[TokenType::If])? {
             return self.if_expression();
