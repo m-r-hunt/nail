@@ -12,6 +12,7 @@ struct Parser {
 pub enum Literal {
     Number(f64),
     String(String),
+    Char(char),
     False,
     True,
     Nil,
@@ -661,6 +662,12 @@ impl Parser {
             let s = self.scanner.get_lexeme(&t);
             let s = &s[1..s.len() - 1];
             return Ok(Expression::Literal(Literal::String(s.to_string())));
+        }
+        if self.matches(&[TokenType::CharLiteral])? {
+            let t = self.previous();
+            let s = self.scanner.get_lexeme(&t);
+            let c = s.chars().collect::<Vec<char>>()[1];
+            return Ok(Expression::Literal(Literal::Char(c)));
         }
         if self.matches(&[TokenType::Identifier])? {
             let t = self.previous();

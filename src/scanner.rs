@@ -51,6 +51,7 @@ pub enum TokenType {
     Identifier,
     String,
     Number,
+    CharLiteral,
 
     And,
     Break,
@@ -220,6 +221,8 @@ impl Scanner {
 
             '"' => self.string(),
 
+            '\'' => self.char(),
+
             n if is_digit(n) => self.number(),
             a if is_alpha(a) => self.identifier(),
 
@@ -306,6 +309,15 @@ impl Scanner {
         self.advance();
 
         return Ok(self.make_token(TokenType::String));
+    }
+
+    fn char(&mut self) -> Result<Token> {
+        self.advance();
+        if !(self.peek() == '\'') {
+            return Err(ScannerError("Unterminated char literal.".to_string()));
+        }
+        self.advance();
+        return Ok(self.make_token(TokenType::CharLiteral));
     }
 
     fn number(&mut self) -> Result<Token> {

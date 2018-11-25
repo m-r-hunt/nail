@@ -404,6 +404,14 @@ impl VM {
                     self.stack_top -= n as usize;
                 }
 
+                Some(chunk::OpCode::PushTrue) => {
+                    self.push(value::Value::Boolean(true));
+                }
+
+                Some(chunk::OpCode::PushFalse) => {
+                    self.push(value::Value::Boolean(false));
+                }
+
                 None => {
                     return Err(InterpreterError::RuntimeError(
                         "Bad instruction".to_string(),

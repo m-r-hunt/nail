@@ -51,6 +51,9 @@ pub enum OpCode {
     TestNotEqual = 30,
 
     PopMulti = 31,
+
+    PushTrue = 32,
+    PushFalse = 33,
 }
 
 impl OpCode {
@@ -104,6 +107,9 @@ impl OpCode {
             30 => Some(OpCode::TestNotEqual),
 
             31 => Some(OpCode::PopMulti),
+
+            32 => Some(OpCode::PushTrue),
+            33 => Some(OpCode::PushFalse),
 
             _ => None,
         }

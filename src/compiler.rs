@@ -209,7 +209,26 @@ impl Compiler {
                 self.chunk.write_chunk(c, 1);
                 self.adjust_stack_usage(1);
             }
-            _ => panic!("Unimplemented literal"),
+            parser::Literal::Char(c) => {
+                let c = self
+                    .chunk
+                    .add_constant(value::Value::Number(c as u64 as f64));
+                self.chunk.write_chunk(OpCode::Constant as u8, 1);
+                self.chunk.write_chunk(c, 1);
+                self.adjust_stack_usage(1);
+            }
+            parser::Literal::False => {
+                self.chunk.write_chunk(OpCode::PushFalse as u8, 1);
+                self.adjust_stack_usage(1);
+            }
+            parser::Literal::True => {
+                self.chunk.write_chunk(OpCode::PushTrue as u8, 1);
+                self.adjust_stack_usage(1);
+            }
+            parser::Literal::Nil => {
+                self.chunk.write_chunk(OpCode::PushNil as u8, 1);
+                self.adjust_stack_usage(1);
+            }
         }
     }
 
