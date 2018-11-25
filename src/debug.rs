@@ -66,6 +66,8 @@ pub fn disassemble_instruction(chunk: &Chunk, offset: usize) -> usize {
         Some(OpCode::TestEqual) => simple_instruction("OP_TEST_EQUAL", offset),
         Some(OpCode::TestNotEqual) => simple_instruction("OP_TEST_Not_EQUAL", offset),
 
+        Some(OpCode::PopMulti) => number_instruction("OP_POP_MULTI", &chunk, offset),
+
         None => {
             println!("Unknown opcode {}", instr);
             offset + 1

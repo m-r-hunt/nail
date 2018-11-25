@@ -390,6 +390,11 @@ impl VM {
                     }
                 }
 
+                Some(chunk::OpCode::PopMulti) => {
+                    let n = self.read_byte();
+                    self.stack_top -= n as usize;
+                }
+
                 None => {
                     return Err(InterpreterError::RuntimeError(
                         "Bad instruction".to_string(),

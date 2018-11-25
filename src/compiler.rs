@@ -28,6 +28,7 @@ struct Compiler {
     environments: Vec<Environment>,
     deferred: Vec<parser::FnStatement>,
     max_local: u8,
+    pushed_this_fn: u8,
 }
 
 impl Compiler {
@@ -37,6 +38,7 @@ impl Compiler {
             environments: vec![Environment::new(0)],
             deferred: Vec::new(),
             max_local: 0,
+            pushed_this_fn: 0,
         }
     }
 
@@ -92,17 +94,20 @@ impl Compiler {
             self.compile_expression(expression);
             self.chunk.write_chunk(OpCode::AssignLocal as u8, 1);
             self.chunk.write_chunk(local_number, 1);
+            self.pushed_this_fn -= 1;
         });
     }
 
     fn compile_print_statement(&mut self, statement: parser::PrintStatement) {
         self.compile_expression(statement.value);
         self.chunk.write_chunk(OpCode::Print as u8, 1);
+        self.pushed_this_fn -= 1;
     }
 
     fn compile_expression_statement(&mut self, statement: parser::ExpressionStatement) {
         self.compile_expression(statement.expression);
         self.chunk.write_chunk(OpCode::Pop as u8, 1);
+        self.pushed_this_fn -= 1;
     }
 
     fn compile_fn_statement(&mut self, fn_statement: parser::FnStatement, top_level: bool) {
@@ -112,6 +117,7 @@ impl Compiler {
             self.deferred.push(fn_statement);
         } else {
             self.max_local = 0;
+            self.pushed_this_fn = 0;
             let locals_addr = self.chunk.start_function(fn_statement.name, 1);
             for arg in fn_statement.args.into_iter().rev() {
                 let local_number = self.bind_local(arg);
@@ -141,6 +147,7 @@ impl Compiler {
             parser::Expression::Array(a) => self.compile_array(a),
             parser::Expression::BuiltinCall(c) => self.compile_builtin_call(c),
             parser::Expression::Range(r) => self.compile_range(r),
+            parser::Expression::Return(r) => self.compile_return(r),
         }
     }
 
@@ -150,11 +157,13 @@ impl Compiler {
                 let c = self.chunk.add_constant(value::Value::Number(n));
                 self.chunk.write_chunk(OpCode::Constant as u8, 1);
                 self.chunk.write_chunk(c, 1);
+                self.pushed_this_fn += 1;
             }
             parser::Literal::String(s) => {
                 let c = self.chunk.add_constant(value::Value::String(s));
                 self.chunk.write_chunk(OpCode::Constant as u8, 1);
                 self.chunk.write_chunk(c, 1);
+                self.pushed_this_fn += 1;
             }
             _ => panic!("Unimplemented literal"),
         }
@@ -185,6 +194,7 @@ impl Compiler {
             TokenType::BangEqual => self.chunk.write_chunk(OpCode::TestNotEqual as u8, 1),
             _ => panic!("Unimplemented binary operator"),
         }
+        self.pushed_this_fn -= 1;
     }
 
     fn compile_grouping(&mut self, grouping: parser::Grouping) {
@@ -195,6 +205,7 @@ impl Compiler {
         let number = self.find_local(&variable.name).unwrap();
         self.chunk.write_chunk(OpCode::LoadLocal as u8, 1);
         self.chunk.write_chunk(number, 1);
+        self.pushed_this_fn += 1;
     }
 
     fn compile_block(&mut self, block: parser::Block) {
@@ -204,12 +215,16 @@ impl Compiler {
         }
         match block.expression {
             Some(e) => self.compile_expression(*e),
-            None => self.chunk.write_chunk(OpCode::PushNil as u8, 1),
+            None => {
+                self.chunk.write_chunk(OpCode::PushNil as u8, 1);
+                self.pushed_this_fn += 1;
+            }
         }
         self.pop_environment();
     }
 
     fn compile_call(&mut self, call: parser::Call) {
+        let nargs = call.args.len() as u8;
         for e in call.args {
             self.compile_expression(e);
         }
@@ -220,6 +235,8 @@ impl Compiler {
         } else {
             panic!("Expected variable in call");
         }
+        self.pushed_this_fn -= nargs;
+        self.pushed_this_fn += 1;
     }
 
     fn insert_jump_address(&mut self, jump_target_address: usize, dest_address: usize) {
@@ -231,6 +248,7 @@ impl Compiler {
         self.compile_expression(*if_expression.condition);
         self.chunk.write_chunk(OpCode::JumpIfFalse as u8, 1);
         self.chunk.write_chunk(0, 1);
+        self.pushed_this_fn -= 1;
         let jump_target_address = self.chunk.code.len() - 1;
         self.compile_block(if_expression.then_block);
         self.chunk.write_chunk(OpCode::Jump as u8, 1);
@@ -238,9 +256,13 @@ impl Compiler {
         let else_target_address = self.chunk.code.len() - 1;
         let addr = self.chunk.code.len();
         self.insert_jump_address(jump_target_address, addr);
+        self.pushed_this_fn -= 1;
         match if_expression.else_block {
             Some(b) => self.compile_block(b),
-            None => self.chunk.write_chunk(OpCode::PushNil as u8, 1),
+            None => {
+                self.chunk.write_chunk(OpCode::PushNil as u8, 1);
+                self.pushed_this_fn += 1;
+            }
         }
         let addr = self.chunk.code.len();
         self.insert_jump_address(else_target_address, addr);
@@ -251,15 +273,18 @@ impl Compiler {
         self.compile_expression(*while_expression.condition);
         self.chunk.write_chunk(OpCode::JumpIfFalse as u8, 1);
         self.chunk.write_chunk(0, 1);
+        self.pushed_this_fn -= 1;
         let jump_target_address = self.chunk.code.len() - 1;
         self.compile_block(while_expression.block);
         self.chunk.write_chunk(OpCode::Pop as u8, 1);
+        self.pushed_this_fn -= 1;
         self.chunk.write_chunk(OpCode::Jump as u8, 1);
         self.chunk.write_chunk(0, 1);
         let current_address = self.chunk.code.len();
         self.insert_jump_address(current_address - 1, while_start_address);
         self.insert_jump_address(jump_target_address, current_address);
         self.chunk.write_chunk(OpCode::PushNil as u8, 1);
+        self.pushed_this_fn += 1;
     }
 
     fn compile_for(&mut self, for_expression: parser::For) {
@@ -272,6 +297,7 @@ impl Compiler {
         let for_jump_target_address = self.chunk.code.len() - 1;
         self.compile_block(for_expression.block);
         self.chunk.write_chunk(OpCode::Pop as u8, 1);
+        self.pushed_this_fn -= 1;
         self.chunk.write_chunk(OpCode::Jump as u8, 1);
         self.chunk.write_chunk(0, 1);
         let current_address = self.chunk.code.len();
@@ -287,32 +313,39 @@ impl Compiler {
                 self.chunk.write_chunk(OpCode::AssignLocal as u8, 1);
                 let local_number = self.find_local(&v.name).unwrap();
                 self.chunk.write_chunk(local_number, 1);
+                self.pushed_this_fn -= 1;
             }
             parser::LValue::Index(i) => {
                 self.compile_expression(*i.indexer);
                 self.compile_expression(*i.value);
                 self.compile_expression(*assignment.value);
                 self.chunk.write_chunk(OpCode::IndexAssign as u8, 1);
+                self.pushed_this_fn -= 3;
             }
         }
         self.chunk.write_chunk(OpCode::PushNil as u8, 1);
+        self.pushed_this_fn += 1;
     }
 
     fn compile_index(&mut self, index: parser::Index) {
         self.compile_expression(*index.indexer);
         self.compile_expression(*index.value);
         self.chunk.write_chunk(OpCode::Index as u8, 1);
+        self.pushed_this_fn -= 2;
     }
 
     fn compile_array(&mut self, array: parser::Array) {
         self.chunk.write_chunk(OpCode::NewArray as u8, 1);
+        self.pushed_this_fn += 1;
         for e in array.initializers {
             self.compile_expression(e);
             self.chunk.write_chunk(OpCode::PushArray as u8, 1);
+            self.pushed_this_fn -= 1;
         }
     }
 
     fn compile_builtin_call(&mut self, builtin_call: parser::BuiltinCall) {
+        let nargs = builtin_call.args.len() as u8;
         for e in builtin_call.args {
             self.compile_expression(e);
         }
@@ -322,12 +355,32 @@ impl Compiler {
             .add_constant(value::Value::String(builtin_call.name));
         self.chunk.write_chunk(OpCode::Constant as u8, 1);
         self.chunk.write_chunk(c, 1);
+        self.pushed_this_fn += 1;
         self.chunk.write_chunk(OpCode::BuiltinCall as u8, 1);
+        self.pushed_this_fn -= 1 + nargs;
+        self.pushed_this_fn += 1;
     }
 
     fn compile_range(&mut self, range: parser::Range) {
         self.compile_expression(*range.left);
         self.compile_expression(*range.right);
         self.chunk.write_chunk(OpCode::MakeRange as u8, 1);
+        self.pushed_this_fn -= 1;
+    }
+
+    fn compile_return(&mut self, return_expression: parser::Return) {
+        if self.pushed_this_fn > 0 {
+            self.chunk.write_chunk(OpCode::PopMulti as u8, 1);
+            self.chunk.write_chunk(self.pushed_this_fn, 1);
+            self.pushed_this_fn = 0;
+        }
+        match return_expression.value {
+            Some(e) => self.compile_expression(*e),
+            None => {
+                self.chunk.write_chunk(OpCode::PushNil as u8, 1);
+                self.pushed_this_fn += 1;
+            }
+        }
+        self.chunk.write_chunk(OpCode::Return as u8, 1);
     }
 }

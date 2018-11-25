@@ -109,6 +109,11 @@ pub struct Range {
 }
 
 #[derive(Debug)]
+pub struct Return {
+    pub value: Option<Box<Expression>>,
+}
+
+#[derive(Debug)]
 pub enum Expression {
     Literal(Literal),
     Unary(Unary),
@@ -125,6 +130,7 @@ pub enum Expression {
     Array(Array),
     BuiltinCall(BuiltinCall),
     Range(Range),
+    Return(Return),
 }
 
 #[derive(Debug)]
@@ -519,6 +525,15 @@ impl Parser {
         }));
     }
 
+    fn return_expression(&mut self) -> Result<Expression> {
+        let mut value = None;
+        // TODO: Check how Rust works out wether a return has an expression.
+        if !(self.check(TokenType::Semicolon) || self.check(TokenType::RightBrace)) {
+            value = Some(Box::new(self.expression()?));
+        }
+        return Ok(Expression::Return(Return { value }));
+    }
+
     fn array(&mut self) -> Result<Expression> {
         let mut out = Array {
             initializers: Vec::new(),
@@ -551,6 +566,9 @@ impl Parser {
         }
         if self.matches(&[TokenType::For])? {
             return self.for_expression();
+        }
+        if self.matches(&[TokenType::Return])? {
+            return self.return_expression();
         }
         if self.matches(&[TokenType::False])? {
             return Ok(Expression::Literal(Literal::False));
