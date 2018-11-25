@@ -1,4 +1,6 @@
-use super::{chunk, chunk::OpCode, debug, errors::Result, parser, scanner::TokenType, value};
+use super::{
+    chunk, chunk::OpCode, debug, errors::Result, parser, scanner, scanner::TokenType, value,
+};
 use std::collections::HashMap;
 
 pub fn compile(source: &str) -> Result<chunk::Chunk> {
@@ -182,6 +184,7 @@ impl Compiler {
             parser::Expression::For(f) => self.compile_for(f),
             parser::Expression::Loop(l) => self.compile_loop(l),
             parser::Expression::Assignment(a) => self.compile_assignment(a),
+            parser::Expression::CompoundAssignment(ca) => self.compile_compound_assignment(ca),
             parser::Expression::Index(i) => self.compile_index(i),
             parser::Expression::Array(a) => self.compile_array(a),
             parser::Expression::BuiltinCall(c) => self.compile_builtin_call(c),
@@ -385,6 +388,33 @@ impl Compiler {
         }
         self.chunk.write_chunk(OpCode::PushNil as u8, 1);
         self.adjust_stack_usage(1);
+    }
+
+    fn compile_compound_assignment(&mut self, compound_assignment: parser::CompoundAssignment) {
+        let op = scanner::Token {
+            token_type: match compound_assignment.operator {
+                TokenType::MinusEqual => TokenType::Minus,
+                TokenType::PlusEqual => TokenType::Plus,
+                TokenType::StarEqual => TokenType::Star,
+                TokenType::SlashEqual => TokenType::Slash,
+                _ => panic!("Unsupported compound assignment"),
+            },
+            start: 0,
+            length: 0,
+            line: 1,
+        };
+        let lvalue = Box::new(match compound_assignment.lvalue.clone() {
+            parser::LValue::Variable(v) => parser::Expression::Variable(v),
+            parser::LValue::Index(i) => parser::Expression::Index(i),
+        });
+        self.compile_assignment(parser::Assignment {
+            lvalue: compound_assignment.lvalue,
+            value: Box::new(parser::Expression::Binary(parser::Binary {
+                left: lvalue,
+                operator: op,
+                right: compound_assignment.value,
+            })),
+        });
     }
 
     fn compile_index(&mut self, index: parser::Index) {

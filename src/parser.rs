@@ -8,7 +8,7 @@ struct Parser {
     next: scanner::Token,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Literal {
     Number(f64),
     String(String),
@@ -17,108 +17,115 @@ pub enum Literal {
     Nil,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Unary {
     pub operator: scanner::Token,
     pub expression: Box<Expression>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Binary {
     pub left: Box<Expression>,
     pub operator: scanner::Token,
     pub right: Box<Expression>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Grouping {
     pub expression: Box<Expression>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Variable {
     pub name: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Block {
     pub statements: Vec<Statement>,
     pub expression: Option<Box<Expression>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Call {
     pub callee: Box<Expression>,
     pub args: Vec<Expression>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BuiltinCall {
     pub callee: Box<Expression>,
     pub name: String,
     pub args: Vec<Expression>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct If {
     pub condition: Box<Expression>,
     pub then_block: Block,
     pub else_block: Option<Block>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct While {
     pub condition: Box<Expression>,
     pub block: Block,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct For {
     pub variable: String,
     pub range: Box<Expression>,
     pub block: Block,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Loop {
     pub block: Block,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum LValue {
     Variable(Variable),
     Index(Index),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Assignment {
     pub lvalue: LValue,
     pub value: Box<Expression>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
+pub struct CompoundAssignment {
+    pub lvalue: LValue,
+    pub operator: TokenType,
+    pub value: Box<Expression>,
+}
+
+#[derive(Debug, Clone)]
 pub struct Index {
     pub indexer: Box<Expression>,
     pub value: Box<Expression>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Array {
     pub initializers: Vec<Expression>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Range {
     pub left: Box<Expression>,
     pub right: Box<Expression>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Return {
     pub value: Option<Box<Expression>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Expression {
     Literal(Literal),
     Unary(Unary),
@@ -132,6 +139,7 @@ pub enum Expression {
     For(For),
     Loop(Loop),
     Assignment(Assignment),
+    CompoundAssignment(CompoundAssignment),
     Index(Index),
     Array(Array),
     BuiltinCall(BuiltinCall),
@@ -141,30 +149,30 @@ pub enum Expression {
     Continue,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ExpressionStatement {
     pub expression: Expression,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PrintStatement {
     pub value: Expression,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LetStatement {
     pub name: String,
     pub initializer: Option<Expression>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FnStatement {
     pub name: String,
     pub args: Vec<String>,
     pub block: Block,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Statement {
     ExpressionStatement(ExpressionStatement),
     LetStatement(LetStatement),
@@ -172,7 +180,7 @@ pub enum Statement {
     FnStatement(FnStatement),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Program {
     pub statements: Vec<Statement>,
 }
@@ -257,7 +265,7 @@ impl Parser {
     }
 
     fn expression(&mut self) -> Result<Expression> {
-        return self.assignment();
+        return self.compound_assignment();
     }
 
     fn can_be_statement_without_semicolon(&self, expression: &Expression) -> bool {
@@ -314,6 +322,42 @@ impl Parser {
             statements,
             expression,
         });
+    }
+
+    fn compound_assignment(&mut self) -> Result<Expression> {
+        let mut expr = self.assignment()?;
+        while self.matches(&[
+            TokenType::MinusEqual,
+            TokenType::PlusEqual,
+            TokenType::StarEqual,
+            TokenType::SlashEqual,
+        ])? {
+            let operator = self.previous().token_type;
+            let value = self.expression()?;
+            match expr {
+                Expression::Variable(v) => {
+                    expr = Expression::CompoundAssignment(CompoundAssignment {
+                        lvalue: LValue::Variable(v),
+                        operator,
+                        value: Box::new(value),
+                    })
+                }
+                Expression::Index(i) => {
+                    expr = Expression::CompoundAssignment(CompoundAssignment {
+                        lvalue: LValue::Index(i),
+                        operator,
+                        value: Box::new(value),
+                    })
+                }
+                _ => {
+                    return Err(ParserError(
+                        "Not a valid LValue in assignment".to_string(),
+                        self.previous().line,
+                    ))
+                }
+            }
+        }
+        return Ok(expr);
     }
 
     fn assignment(&mut self) -> Result<Expression> {
@@ -535,7 +579,7 @@ impl Parser {
 
     fn loop_expression(&mut self) -> Result<Expression> {
         let block = self.block()?;
-        return Ok(Expression::Loop(Loop{block}));
+        return Ok(Expression::Loop(Loop { block }));
     }
 
     fn return_expression(&mut self) -> Result<Expression> {

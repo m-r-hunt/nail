@@ -23,12 +23,19 @@ pub enum TokenType {
     Comma,
     Dot,
     DotDot,
-    Minus,
-    Plus,
+
     Semicolon,
     Colon,
+
+    Minus,
+    MinusEqual,
+    Plus,
+    PlusEqual,
     Slash,
+    SlashEqual,
     Star,
+    StarEqual,
+
     Percent,
 
     Bang,
@@ -125,11 +132,40 @@ impl Scanner {
             ';' => Ok(self.make_token(TokenType::Semicolon)),
             ':' => Ok(self.make_token(TokenType::Colon)),
             ',' => Ok(self.make_token(TokenType::Comma)),
-            '-' => Ok(self.make_token(TokenType::Minus)),
-            '+' => Ok(self.make_token(TokenType::Plus)),
-            '/' => Ok(self.make_token(TokenType::Slash)),
-            '*' => Ok(self.make_token(TokenType::Star)),
             '%' => Ok(self.make_token(TokenType::Percent)),
+
+            '-' => {
+                let token_type = if self.token_match('=') {
+                    TokenType::MinusEqual
+                } else {
+                    TokenType::Minus
+                };
+                Ok(self.make_token(token_type))
+            }
+            '+' => {
+                let token_type = if self.token_match('=') {
+                    TokenType::PlusEqual
+                } else {
+                    TokenType::Plus
+                };
+                Ok(self.make_token(token_type))
+            }
+            '/' => {
+                let token_type = if self.token_match('=') {
+                    TokenType::SlashEqual
+                } else {
+                    TokenType::Slash
+                };
+                Ok(self.make_token(token_type))
+            }
+            '*' => {
+                let token_type = if self.token_match('=') {
+                    TokenType::StarEqual
+                } else {
+                    TokenType::Star
+                };
+                Ok(self.make_token(token_type))
+            }
 
             '.' => {
                 let token_type = if self.token_match('.') {
