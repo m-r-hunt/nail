@@ -180,6 +180,7 @@ impl Compiler {
             parser::Expression::If(i) => self.compile_if(i),
             parser::Expression::While(w) => self.compile_while(w),
             parser::Expression::For(f) => self.compile_for(f),
+            parser::Expression::Loop(l) => self.compile_loop(l),
             parser::Expression::Assignment(a) => self.compile_assignment(a),
             parser::Expression::Index(i) => self.compile_index(i),
             parser::Expression::Array(a) => self.compile_array(a),
@@ -350,6 +351,21 @@ impl Compiler {
         self.pop_loop_context(current_address);
     }
 
+    fn compile_loop(&mut self, loop_expression: parser::Loop) {
+        let loop_start_address = self.chunk.code.len();
+        self.push_loop_context(loop_start_address, false);
+        self.compile_block(loop_expression.block);
+        self.chunk.write_chunk(OpCode::Pop as u8, 1);
+        self.adjust_stack_usage(-1);
+        self.chunk.write_chunk(OpCode::Jump as u8, 1);
+        self.chunk.write_chunk(0, 1);
+        let current_address = self.chunk.code.len();
+        self.insert_jump_address(current_address - 1, loop_start_address);
+        self.pop_loop_context(current_address);
+        self.chunk.write_chunk(OpCode::PushNil as u8, 1);
+        self.adjust_stack_usage(1);
+    }
+
     fn compile_assignment(&mut self, assignment: parser::Assignment) {
         match assignment.lvalue {
             parser::LValue::Variable(v) => {
@@ -416,7 +432,6 @@ impl Compiler {
         if self.pushed_this_fn > 0 {
             self.chunk.write_chunk(OpCode::PopMulti as u8, 1);
             self.chunk.write_chunk(self.pushed_this_fn, 1);
-            self.pushed_this_fn = 0;
         }
         match return_expression.value {
             Some(e) => self.compile_expression(*e),
@@ -426,6 +441,7 @@ impl Compiler {
             }
         }
         self.chunk.write_chunk(OpCode::Return as u8, 1);
+        self.adjust_stack_usage(1); // Logically this should be an expression returning a value, but it doesn't return.
     }
 
     fn compile_continue(&mut self) {
@@ -433,13 +449,13 @@ impl Compiler {
             self.chunk.write_chunk(OpCode::PopMulti as u8, 1);
             self.chunk
                 .write_chunk(self.loop_contexts.last().unwrap().pushed_this_loop, 1);
-            self.pushed_this_fn = 0;
         }
         self.chunk.write_chunk(OpCode::Jump as u8, 1);
         self.chunk.write_chunk(0, 1);
         let jump_target_address = self.chunk.code.len() - 1;
         let continue_address = self.loop_contexts.last().unwrap().continue_address;
         self.insert_jump_address(jump_target_address, continue_address);
+        self.adjust_stack_usage(1); // Logically this should be an expression returning a value, but it doesn't return.
     }
 
     fn compile_break(&mut self) {
@@ -447,7 +463,7 @@ impl Compiler {
             self.chunk.write_chunk(OpCode::PopMulti as u8, 1);
             self.chunk
                 .write_chunk(self.loop_contexts.last().unwrap().pushed_this_loop, 1);
-            self.pushed_this_fn = 0;
+            self.loop_contexts.last_mut().unwrap().pushed_this_loop = 0;
         }
         if self.loop_contexts.last().unwrap().break_pop {
             self.chunk.write_chunk(OpCode::Pop as u8, 1);
@@ -459,5 +475,6 @@ impl Compiler {
             .unwrap()
             .breaks
             .push(self.chunk.code.len() - 1);
+        self.adjust_stack_usage(1); // Logically this should be an expression returning a value, but it doesn't return.
     }
 }

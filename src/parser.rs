@@ -80,6 +80,11 @@ pub struct For {
 }
 
 #[derive(Debug)]
+pub struct Loop {
+    pub block: Block,
+}
+
+#[derive(Debug)]
 pub enum LValue {
     Variable(Variable),
     Index(Index),
@@ -125,6 +130,7 @@ pub enum Expression {
     If(If),
     While(While),
     For(For),
+    Loop(Loop),
     Assignment(Assignment),
     Index(Index),
     Array(Array),
@@ -527,6 +533,11 @@ impl Parser {
         }));
     }
 
+    fn loop_expression(&mut self) -> Result<Expression> {
+        let block = self.block()?;
+        return Ok(Expression::Loop(Loop{block}));
+    }
+
     fn return_expression(&mut self) -> Result<Expression> {
         let mut value = None;
         // TODO: Check how Rust works out wether a return has an expression.
@@ -568,6 +579,9 @@ impl Parser {
         }
         if self.matches(&[TokenType::For])? {
             return self.for_expression();
+        }
+        if self.matches(&[TokenType::Loop])? {
+            return self.loop_expression();
         }
         if self.matches(&[TokenType::Return])? {
             return self.return_expression();

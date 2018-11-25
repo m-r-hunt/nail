@@ -60,6 +60,7 @@ pub enum TokenType {
     Return,
     True,
     Let,
+    Loop,
     While,
 
     EOF,
@@ -93,6 +94,7 @@ impl Scanner {
         kw_map.insert("return".to_string(), TokenType::Return);
         kw_map.insert("true".to_string(), TokenType::True);
         kw_map.insert("let".to_string(), TokenType::Let);
+        kw_map.insert("loop".to_string(), TokenType::Loop);
         kw_map.insert("while".to_string(), TokenType::While);
 
         Scanner {
