@@ -1,40 +1,5 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct ShittyMap {
-    keys: Vec<Value>,
-    values: Vec<Value>,
-}
-
-impl ShittyMap {
-    pub fn new() -> Self {
-        Self {
-            keys: Vec::new(),
-            values: Vec::new(),
-        }
-    }
-
-    pub fn insert(&mut self, key: Value, value: Value) {
-        for (i, k) in self.keys.iter().enumerate() {
-            if *k == key {
-                self.values[i] = value;
-                return;
-            }
-        }
-        self.keys.push(key);
-        self.values.push(value);
-    }
-
-    pub fn lookup(&self, key: Value) -> Value {
-        for (i, k) in self.keys.iter().enumerate() {
-            if *k == key {
-                return self.values[i].clone();
-            }
-        }
-        return Value::Nil;
-    }
-}
+use super::vm::InterpreterError;
+use std::collections::hash_map::HashMap;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -42,9 +7,65 @@ pub enum Value {
     Number(f64),
     Boolean(bool),
     String(String),
-    Array(Rc<RefCell<Vec<Value>>>),
-    Map(Rc<RefCell<ShittyMap>>),
+    ReferenceId(usize),
     Range(f64, f64),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct SanitizedFloat {
+    pub mantissa: u64,
+    pub exponent: i16,
+    pub sign: i8,
+}
+
+impl SanitizedFloat {
+    fn try_from(value: f64) -> Result<Self, InterpreterError> {
+        use num::Float;
+        if !value.is_finite() {
+            return Err(InterpreterError::RuntimeError(
+                "Tried to hash bad float.".to_string(),
+            ));
+        } else {
+            let (mantissa, exponent, sign) = value.integer_decode();
+            return Ok(SanitizedFloat {
+                mantissa,
+                exponent,
+                sign,
+            });
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum HashableValue {
+    Nil,
+    Number(SanitizedFloat),
+    Boolean(bool),
+    String(String),
+    ReferenceId(usize),
+    Range(SanitizedFloat, SanitizedFloat),
+}
+
+impl HashableValue {
+    pub fn try_from(value: Value) -> Result<Self, InterpreterError> {
+        match value {
+            Value::Nil => Ok(HashableValue::Nil),
+            Value::Number(f) => Ok(HashableValue::Number(SanitizedFloat::try_from(f)?)),
+            Value::Boolean(b) => Ok(HashableValue::Boolean(b)),
+            Value::String(s) => Ok(HashableValue::String(s)),
+            Value::ReferenceId(i) => Ok(HashableValue::ReferenceId(i)),
+            Value::Range(l, r) => Ok(HashableValue::Range(
+                SanitizedFloat::try_from(l)?,
+                SanitizedFloat::try_from(r)?,
+            )),
+        }
+    }
+}
+
+pub enum ReferenceType {
+    Nil,
+    Array(Vec<Value>),
+    Map(HashMap<HashableValue, Value>),
 }
 
 impl std::fmt::Display for Value {
@@ -54,8 +75,7 @@ impl std::fmt::Display for Value {
             Value::Number(n) => write!(f, "{}", n),
             Value::Boolean(b) => write!(f, "{}", b),
             Value::String(s) => write!(f, "{}", s),
-            Value::Array(a) => write!(f, "Array({:p})", a),
-            Value::Map(m) => write!(f, "Map{:p})", m),
+            Value::ReferenceId(i) => write!(f, "RefId({})", i),
             Value::Range(l, r) => write!(f, "{}..{}", l, r),
         }
     }

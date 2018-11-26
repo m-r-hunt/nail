@@ -5,6 +5,7 @@ authors = ["Max Hunt <max@huntw3.com>"]
 autobins = false
 
 [dependencies]
+num = "0.2"
 
 [lib]
 name = "notlox"

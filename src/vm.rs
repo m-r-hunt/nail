@@ -1,6 +1,5 @@
-use super::{chunk, compiler, debug, errors::NotloxError, value};
-use std::cell::RefCell;
-use std::rc::Rc;
+use super::{chunk, compiler, debug, errors::NotloxError, value::*};
+use std::collections::HashMap;
 
 const STACK_SIZE: usize = 256;
 
@@ -13,13 +12,14 @@ struct CallFrame {
 pub struct VM {
     chunk: chunk::Chunk,
     ip: usize,
-    stack: [value::Value; STACK_SIZE],
+    stack: [Value; STACK_SIZE],
     stack_top: usize,
     return_stack: [CallFrame; 256],
     return_stack_top: usize,
-    locals: [value::Value; 256],
+    locals: [Value; 256],
     locals_base: usize,
     locals_top: usize,
+    heap: Vec<ReferenceType>,
 }
 
 #[derive(Debug)]
@@ -49,18 +49,18 @@ macro_rules! binary_op {
     ( $self:expr, $op:tt, $type: ident, $ret:ident ) => {
         {
             let mut b;
-            if let value::Value::$type(bval) = $self.pop() {
+            if let Value::$type(bval) = $self.pop() {
                 b = bval;
             } else {
                 return Err(InterpreterError::RuntimeError("Bad argument to binary operator, not a number.".to_string()));
             }
             let mut a;
-            if let value::Value::$type(aval) = $self.pop() {
+            if let Value::$type(aval) = $self.pop() {
                 a = aval;
             } else {
                 return Err(InterpreterError::RuntimeError("Bad argument to binary operator, not a number.".to_string()));
             }
-            $self.push(value::Value::$ret(a $op b))
+            $self.push(Value::$ret(a $op b))
         }
     }
 }
@@ -68,9 +68,9 @@ macro_rules! binary_op {
 impl VM {
     pub fn new() -> VM {
         let array = unsafe {
-            let mut array: [value::Value; STACK_SIZE] = std::mem::uninitialized();
+            let mut array: [Value; STACK_SIZE] = std::mem::uninitialized();
             for i in 0..STACK_SIZE {
-                array[i] = value::Value::Nil;
+                array[i] = Value::Nil;
             }
             array
         };
@@ -88,17 +88,18 @@ impl VM {
             locals: array,
             locals_base: 0,
             locals_top: 0,
+            heap: Vec::new(),
         }
     }
 
-    pub fn interpret(&mut self, source: &str) -> Result<value::Value, InterpreterError> {
+    pub fn interpret(&mut self, source: &str) -> Result<Value, InterpreterError> {
         let chunk = compiler::compile(source)?;
         self.chunk = chunk;
         self.ip = self.chunk.lookup_function("main");
         self.run()
     }
 
-    pub fn run(&mut self) -> Result<value::Value, InterpreterError> {
+    pub fn run(&mut self) -> Result<Value, InterpreterError> {
         loop {
             if cfg!(feature = "debugTraceExecution") {
                 print!("          ");
@@ -131,8 +132,8 @@ impl VM {
                 }
 
                 Some(chunk::OpCode::Negate) => {
-                    if let value::Value::Number(value) = self.pop() {
-                        self.push(value::Value::Number(-value));
+                    if let Value::Number(value) = self.pop() {
+                        self.push(Value::Number(-value));
                     } else {
                         return Err(InterpreterError::RuntimeError(
                             "Bad argument to unary operator, not a number.".to_string(),
@@ -142,11 +143,11 @@ impl VM {
 
                 Some(chunk::OpCode::Add) => {
                     let top = self.peek();
-                    if let value::Value::Number(_) = top {
+                    if let Value::Number(_) = top {
                         binary_op!(self, +, Number, Number)
-                    } else if let value::Value::String(_) = top {
+                    } else if let Value::String(_) = top {
                         let mut b;
-                        if let value::Value::String(bval) = self.pop() {
+                        if let Value::String(bval) = self.pop() {
                             b = bval;
                         } else {
                             return Err(InterpreterError::RuntimeError(
@@ -154,14 +155,14 @@ impl VM {
                             ));
                         }
                         let mut a;
-                        if let value::Value::String(aval) = self.pop() {
+                        if let Value::String(aval) = self.pop() {
                             a = aval;
                         } else {
                             return Err(InterpreterError::RuntimeError(
                                 "Bad argument to binary operator, not a number.".to_string(),
                             ));
                         }
-                        self.push(value::Value::String(a + &b))
+                        self.push(Value::String(a + &b))
                     } else {
                         return Err(InterpreterError::RuntimeError(
                             "Bad or mismatched arguments to +".to_string(),
@@ -196,7 +197,7 @@ impl VM {
                 }
 
                 Some(chunk::OpCode::PushNil) => {
-                    self.push(value::Value::Nil);
+                    self.push(Value::Nil);
                 }
                 Some(chunk::OpCode::Pop) => {
                     self.pop();
@@ -240,9 +241,9 @@ impl VM {
                     let the_value = self.pop();
                     let indexer = self.pop();
                     match indexer {
-                        value::Value::String(s) => {
+                        Value::String(s) => {
                             let v;
-                            if let value::Value::Number(n) = the_value {
+                            if let Value::Number(n) = the_value {
                                 v = n as usize;
                             } else {
                                 return Err(InterpreterError::RuntimeError(
@@ -251,26 +252,42 @@ impl VM {
                             }
                             // Todo: Make this better and maybe utf8 safe.
                             let c = s.into_bytes()[v];
-                            self.push(value::Value::Number(c as f64));
+                            self.push(Value::Number(c as f64));
                         }
 
-                        value::Value::Array(a) => {
-                            let v;
-                            if let value::Value::Number(n) = the_value {
-                                v = n as usize;
-                            } else {
-                                return Err(InterpreterError::RuntimeError(
-                                    "Index must be number.".to_string(),
-                                ));
+                        Value::ReferenceId(id) => {
+                            let to_push;
+                            {
+                                let ref_type = &mut self.heap[id];
+                                match ref_type {
+                                    ReferenceType::Array(ref mut a) => {
+                                        let v;
+                                        if let Value::Number(n) = the_value {
+                                            v = n as usize;
+                                        } else {
+                                            return Err(InterpreterError::RuntimeError(
+                                                "Index must be number.".to_string(),
+                                            ));
+                                        }
+                                        if v >= a.len() {
+                                            a.resize(v + 1, Value::Nil);
+                                        }
+                                        to_push = a[v].clone();
+                                    }
+                                    ReferenceType::Map(m) => {
+                                        let hashable_value =
+                                            HashableValue::try_from(the_value).unwrap();
+                                        to_push =
+                                            m.get(&hashable_value).unwrap_or(&Value::Nil).clone();
+                                    }
+                                    _ => {
+                                        return Err(InterpreterError::RuntimeError(
+                                            "Don't know how to index that.".to_string(),
+                                        ));
+                                    }
+                                }
                             }
-                            if v >= a.borrow().len() {
-                                a.borrow_mut().resize(v + 1, value::Value::Nil);
-                            }
-                            self.push(a.borrow()[v].clone());
-                        }
-
-                        value::Value::Map(m) => {
-                            self.push(m.borrow().lookup(the_value));
+                            self.push(to_push);
                         }
 
                         _ => {
@@ -282,19 +299,35 @@ impl VM {
                 }
 
                 Some(chunk::OpCode::NewArray) => {
-                    self.push(value::Value::Array(Rc::new(RefCell::new(Vec::new()))));
+                    let id = self.new_reference_type(ReferenceType::Array(Vec::new()));
+                    self.push(Value::ReferenceId(id));
                 }
 
                 Some(chunk::OpCode::PushArray) => {
                     let value = self.pop();
                     let array = self.pop();
-                    if let value::Value::Array(a) = array {
-                        a.borrow_mut().push(value);
-                        self.push(value::Value::Array(a));
-                    } else {
-                        return Err(InterpreterError::RuntimeError(
-                            "Array push on non-array".to_string(),
-                        ));
+                    match array {
+                        Value::ReferenceId(id) => {
+                            {
+                                let ref_type = &mut self.heap[id];
+                                match ref_type {
+                                    ReferenceType::Array(ref mut a) => {
+                                        a.push(value);
+                                    }
+                                    _ => {
+                                        return Err(InterpreterError::RuntimeError(
+                                            "Array push on non-array".to_string(),
+                                        ));
+                                    }
+                                }
+                            }
+                            self.push(Value::ReferenceId(id));
+                        }
+                        _ => {
+                            return Err(InterpreterError::RuntimeError(
+                                "Array push on non-array".to_string(),
+                            ));
+                        }
                     }
                 }
 
@@ -303,23 +336,33 @@ impl VM {
                     let index_value = self.pop();
                     let indexer = self.pop();
                     match indexer {
-                        value::Value::Array(a) => {
-                            let n;
-                            if let value::Value::Number(value) = index_value {
-                                n = value as usize;
-                            } else {
-                                return Err(InterpreterError::RuntimeError(
-                                    "Index must be number.".to_string(),
-                                ));
-                            }
-                            if n >= a.borrow().len() {
-                                a.borrow_mut().resize(n + 1, value::Value::Nil);
-                            }
-                            a.borrow_mut()[n] = new_value;
-                        }
+                        Value::ReferenceId(id) => {
+                            let ref_type = &mut self.heap[id];
+                            match ref_type {
+                                ReferenceType::Array(ref mut a) => {
+                                    let n;
+                                    if let Value::Number(value) = index_value {
+                                        n = value as usize;
+                                    } else {
+                                        return Err(InterpreterError::RuntimeError(
+                                            "Index must be number.".to_string(),
+                                        ));
+                                    }
+                                    if n >= a.len() {
+                                        a.resize(n + 1, Value::Nil);
+                                    }
+                                    a[n] = new_value;
+                                }
+                                ReferenceType::Map(ref mut m) => {
+                                    m.insert(HashableValue::try_from(index_value)?, new_value);
+                                }
 
-                        value::Value::Map(m) => {
-                            m.borrow_mut().insert(index_value, new_value);
+                                _ => {
+                                    return Err(InterpreterError::RuntimeError(
+                                        "Don't know how to index assign that".to_string(),
+                                    ));
+                                }
+                            }
                         }
 
                         _ => {
@@ -333,7 +376,7 @@ impl VM {
                 Some(chunk::OpCode::BuiltinCall) => {
                     let builtin = self.pop();
                     let callee = self.pop();
-                    let builtin = if let value::Value::String(s) = builtin {
+                    let builtin = if let Value::String(s) = builtin {
                         s
                     } else {
                         return Err(InterpreterError::RuntimeError(
@@ -343,19 +386,33 @@ impl VM {
 
                     // TODO: Some kind of data driven solution rather than hardcoded ifs.
                     match callee {
-                        value::Value::Array(a) => {
-                            if builtin == "len" {
-                                self.push(value::Value::Number(a.borrow().len() as f64));
-                            } else {
-                                return Err(InterpreterError::RuntimeError(
-                                    "Unknown array builtin".to_string(),
-                                ));
+                        Value::ReferenceId(id) => {
+                            let to_push;
+                            {
+                                let ref_type = &self.heap[id];
+                                match ref_type {
+                                    ReferenceType::Array(a) => {
+                                        if builtin == "len" {
+                                            to_push = Value::Number(a.len() as f64);
+                                        } else {
+                                            return Err(InterpreterError::RuntimeError(
+                                                "Unknown array builtin".to_string(),
+                                            ));
+                                        }
+                                    }
+                                    _ => {
+                                        return Err(InterpreterError::RuntimeError(
+                                            "Unknown builtin".to_string(),
+                                        ))
+                                    }
+                                }
                             }
+                            self.push(to_push);
                         }
 
-                        value::Value::String(s) => {
+                        Value::String(s) => {
                             if builtin == "len" {
-                                self.push(value::Value::Number(s.len() as f64));
+                                self.push(Value::Number(s.len() as f64));
                             } else {
                                 return Err(InterpreterError::RuntimeError(
                                     "Unknown string builtin".to_string(),
@@ -372,21 +429,21 @@ impl VM {
                 }
 
                 Some(chunk::OpCode::MakeRange) => {
-                    let right = if let value::Value::Number(n) = self.pop() {
+                    let right = if let Value::Number(n) = self.pop() {
                         n
                     } else {
                         return Err(InterpreterError::RuntimeError(
                             "Expected number in range bounds".to_string(),
                         ));
                     };
-                    let left = if let value::Value::Number(n) = self.pop() {
+                    let left = if let Value::Number(n) = self.pop() {
                         n
                     } else {
                         return Err(InterpreterError::RuntimeError(
                             "Expected number in range bounds".to_string(),
                         ));
                     };
-                    self.push(value::Value::Range(left, right))
+                    self.push(Value::Range(left, right))
                 }
 
                 Some(chunk::OpCode::ForLoop) => {
@@ -394,22 +451,38 @@ impl VM {
                     let jump_target = self.read_signed_byte();
                     let range = self.pop();
                     match range {
-                        value::Value::Range(l, r) => {
+                        Value::Range(l, r) => {
                             if l < r {
-                                self.locals[local_n as usize + self.locals_base] =
-                                    value::Value::Number(l);
-                                self.push(value::Value::Range(l + 1.0, r));
+                                self.locals[local_n as usize + self.locals_base] = Value::Number(l);
+                                self.push(Value::Range(l + 1.0, r));
                             } else {
                                 self.ip = (self.ip as isize + jump_target as isize) as usize;
                             }
                         }
-                        value::Value::Array(a) => {
-                            if a.borrow().len() > 0 {
-                                self.locals[local_n as usize + self.locals_base] =
-                                    value::Value::Number(0.0);
-                                self.push(value::Value::Range(1.0, a.borrow().len() as f64));
-                            } else {
-                                self.ip = (self.ip as isize + jump_target as isize) as usize;
+                        Value::ReferenceId(id) => {
+                            let mut to_push = None;
+                            {
+                                let ref_type = &mut self.heap[id];
+                                match ref_type {
+                                    ReferenceType::Array(a) => {
+                                        if a.len() > 0 {
+                                            self.locals[local_n as usize + self.locals_base] =
+                                                Value::Number(0.0);
+                                            to_push = Some(Value::Range(1.0, a.len() as f64));
+                                        } else {
+                                            self.ip =
+                                                (self.ip as isize + jump_target as isize) as usize;
+                                        }
+                                    }
+                                    _ => {
+                                        return Err(InterpreterError::RuntimeError(
+                                            "Don't know how to for over that".to_string(),
+                                        ))
+                                    }
+                                }
+                            }
+                            if let Some(p) = to_push {
+                                self.push(p);
                             }
                         }
                         _ => {
@@ -426,26 +499,34 @@ impl VM {
                 }
 
                 Some(chunk::OpCode::PushTrue) => {
-                    self.push(value::Value::Boolean(true));
+                    self.push(Value::Boolean(true));
                 }
 
                 Some(chunk::OpCode::PushFalse) => {
-                    self.push(value::Value::Boolean(false));
+                    self.push(Value::Boolean(false));
                 }
 
                 Some(chunk::OpCode::NewMap) => {
-                    self.push(value::Value::Map(Rc::new(RefCell::new(
-                        value::ShittyMap::new(),
-                    ))));
+                    let id = self.new_reference_type(ReferenceType::Map(HashMap::new()));
+                    self.push(Value::ReferenceId(id));
                 }
 
                 Some(chunk::OpCode::PushMap) => {
                     let value = self.pop();
                     let key = self.pop();
                     let map = self.pop();
-                    if let value::Value::Map(m) = map {
-                        m.borrow_mut().insert(key, value);
-                        self.push(value::Value::Map(m));
+                    if let Value::ReferenceId(id) = map {
+                        {
+                            let map = &mut self.heap[id];
+                            if let ReferenceType::Map(ref mut m) = map {
+                                m.insert(HashableValue::try_from(key)?, value);
+                            } else {
+                                return Err(InterpreterError::RuntimeError(
+                                    "Map push on non-map".to_string(),
+                                ));
+                            }
+                        }
+                        self.push(Value::ReferenceId(id));
                     } else {
                         return Err(InterpreterError::RuntimeError(
                             "Map push on non-map".to_string(),
@@ -471,22 +552,27 @@ impl VM {
         self.read_byte() as i8
     }
 
-    pub fn read_constant(&mut self) -> value::Value {
+    pub fn read_constant(&mut self) -> Value {
         let constant_number = self.read_byte();
         self.chunk.constants[constant_number as usize].clone()
     }
 
-    pub fn push(&mut self, value: value::Value) {
+    pub fn push(&mut self, value: Value) {
         self.stack[self.stack_top] = value;
         self.stack_top += 1
     }
 
-    pub fn pop(&mut self) -> value::Value {
+    pub fn pop(&mut self) -> Value {
         self.stack_top -= 1;
         self.stack[self.stack_top].clone()
     }
 
-    pub fn peek(&mut self) -> value::Value {
+    pub fn peek(&mut self) -> Value {
         self.stack[self.stack_top - 1].clone()
+    }
+
+    pub fn new_reference_type(&mut self, value: ReferenceType) -> usize {
+        self.heap.push(value);
+        return self.heap.len() - 1;
     }
 }

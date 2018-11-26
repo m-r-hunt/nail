@@ -1,3 +1,5 @@
+extern crate num;
+
 pub mod chunk;
 mod compiler;
 pub mod debug;
