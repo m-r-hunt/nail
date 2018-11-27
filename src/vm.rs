@@ -474,12 +474,41 @@ impl VM {
                                                 (self.ip as isize + jump_target as isize) as usize;
                                         }
                                     }
+                                    ReferenceType::Map(m) => {
+                                        let count = m.iter().count();
+                                        if count > 0 {
+                                            self.locals[local_n as usize + self.locals_base] =
+                                                Value::from(m.iter().nth(0).unwrap().0);
+                                            to_push =
+                                                Some(Value::MapForContext(id, 1.0, count as f64));
+                                        } else {
+                                            self.ip =
+                                                (self.ip as isize + jump_target as isize) as usize;
+                                        }
+                                    }
                                     _ => {
                                         return Err(InterpreterError::RuntimeError(
                                             "Don't know how to for over that".to_string(),
                                         ))
                                     }
                                 }
+                            }
+                            if let Some(p) = to_push {
+                                self.push(p);
+                            }
+                        }
+                        Value::MapForContext(id, l, r) => {
+                            let mut to_push = None;
+                            if let ReferenceType::Map(ref m) = self.heap[id] {
+                                if l < r {
+                                    self.locals[local_n as usize + self.locals_base] =
+                                        Value::from(m.iter().nth(l as usize).unwrap().0);
+                                    to_push = Some(Value::MapForContext(id, l + 1.0, r));
+                                } else {
+                                    self.ip = (self.ip as isize + jump_target as isize) as usize;
+                                }
+                            } else {
+                                panic!("Somehow ended up map iterating over non-map?");
                             }
                             if let Some(p) = to_push {
                                 self.push(p);

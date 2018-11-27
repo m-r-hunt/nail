@@ -9,6 +9,7 @@ pub enum Value {
     String(String),
     ReferenceId(usize),
     Range(f64, f64),
+    MapForContext(usize, f64, f64),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -34,6 +35,13 @@ impl SanitizedFloat {
             });
         }
     }
+
+    fn to_f64(&self) -> f64 {
+        let sign_f = self.sign as f64;
+        let mantissa_f = self.mantissa as f64;
+        let exponent_f = 2.0_f64.powf(self.exponent as f64);
+        sign_f * mantissa_f * exponent_f
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -58,6 +66,22 @@ impl HashableValue {
                 SanitizedFloat::try_from(l)?,
                 SanitizedFloat::try_from(r)?,
             )),
+            Value::MapForContext(..) => Err(InterpreterError::RuntimeError(
+                "Tried to hash map for context, this should never happen.".to_string(),
+            )),
+        }
+    }
+}
+
+impl Value {
+    pub fn from(value: &HashableValue) -> Self {
+        match value {
+            HashableValue::Nil => Value::Nil,
+            HashableValue::Number(f) => Value::Number(f.to_f64()),
+            HashableValue::Boolean(b) => Value::Boolean(*b),
+            HashableValue::String(s) => Value::String(s.clone()),
+            HashableValue::ReferenceId(i) => Value::ReferenceId(*i),
+            HashableValue::Range(l, r) => Value::Range(l.to_f64(), r.to_f64()),
         }
     }
 }
@@ -77,6 +101,7 @@ impl std::fmt::Display for Value {
             Value::String(s) => write!(f, "{}", s),
             Value::ReferenceId(i) => write!(f, "RefId({})", i),
             Value::Range(l, r) => write!(f, "{}..{}", l, r),
+            Value::MapForContext(..) => panic!("Attempted to display map for context."),
         }
     }
 }
