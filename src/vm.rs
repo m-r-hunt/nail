@@ -475,12 +475,13 @@ impl VM {
                                         }
                                     }
                                     ReferenceType::Map(m) => {
-                                        let count = m.iter().count();
-                                        if count > 0 {
+                                        let keys: Vec<_> = m.keys().map(|e| e.clone()).collect();
+                                        let len = keys.len();
+                                        if len > 0 {
                                             self.locals[local_n as usize + self.locals_base] =
-                                                Value::from(m.iter().nth(0).unwrap().0);
+                                                Value::from(&keys[0]);
                                             to_push =
-                                                Some(Value::MapForContext(id, 1.0, count as f64));
+                                                Some(Value::MapForContext(keys, 1.0, len as f64));
                                         } else {
                                             self.ip =
                                                 (self.ip as isize + jump_target as isize) as usize;
@@ -497,18 +498,14 @@ impl VM {
                                 self.push(p);
                             }
                         }
-                        Value::MapForContext(id, l, r) => {
+                        Value::MapForContext(keys, l, r) => {
                             let mut to_push = None;
-                            if let ReferenceType::Map(ref m) = self.heap[id] {
-                                if l < r {
-                                    self.locals[local_n as usize + self.locals_base] =
-                                        Value::from(m.iter().nth(l as usize).unwrap().0);
-                                    to_push = Some(Value::MapForContext(id, l + 1.0, r));
-                                } else {
-                                    self.ip = (self.ip as isize + jump_target as isize) as usize;
-                                }
+                            if l < r {
+                                self.locals[local_n as usize + self.locals_base] =
+                                    Value::from(&keys[l as usize]);
+                                to_push = Some(Value::MapForContext(keys, l + 1.0, r));
                             } else {
-                                panic!("Somehow ended up map iterating over non-map?");
+                                self.ip = (self.ip as isize + jump_target as isize) as usize;
                             }
                             if let Some(p) = to_push {
                                 self.push(p);

@@ -9,7 +9,7 @@ pub enum Value {
     String(String),
     ReferenceId(usize),
     Range(f64, f64),
-    MapForContext(usize, f64, f64),
+    MapForContext(Vec<HashableValue>, f64, f64),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
