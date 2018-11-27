@@ -116,8 +116,14 @@ pub struct Array {
 }
 
 #[derive(Debug, Clone)]
+pub enum MapLHS {
+    Name(String),
+    Expression(Expression),
+}
+
+#[derive(Debug, Clone)]
 pub struct MapInitializer {
-    pub name: String,
+    pub key: MapLHS,
     pub value: Box<Expression>,
 }
 
@@ -629,17 +635,37 @@ impl Parser {
             if self.check(TokenType::RightBrace) {
                 break;
             }
-            let name_t = self.consume(
-                TokenType::Identifier,
-                "Expected identifier in map initializer",
-            )?;
-            let name = self.scanner.get_lexeme(&name_t);
-            self.consume(TokenType::Colon, "Expected ':' in map initializer")?;
-            let value = self.expression()?;
-            out.initializers.push(MapInitializer {
-                name,
-                value: Box::new(value),
-            });
+            if self.matches(&[TokenType::LeftBracket])? {
+                let lhs = self.expression()?;
+                self.consume(
+                    TokenType::RightBracket,
+                    "Expected ']' after map key expression",
+                )?;
+                self.consume(TokenType::Colon, "Expected ':' in map initializer")?;
+                let value = self.expression()?;
+                out.initializers.push(MapInitializer {
+                    key: MapLHS::Expression(lhs),
+                    value: Box::new(value),
+                });
+            } else {
+                let name_t = self.consume(
+                    TokenType::Identifier,
+                    "Expected identifier in map initializer",
+                )?;
+                let name = self.scanner.get_lexeme(&name_t);
+                if self.matches(&[TokenType::Colon])? {
+                    let value = self.expression()?;
+                    out.initializers.push(MapInitializer {
+                        key: MapLHS::Name(name),
+                        value: Box::new(value),
+                    });
+                } else {
+                    out.initializers.push(MapInitializer {
+                        key: MapLHS::Name(name.clone()),
+                        value: Box::new(Expression::Variable(Variable { name })),
+                    });
+                }
+            }
             if !self.matches(&[TokenType::Comma])? {
                 break;
             }

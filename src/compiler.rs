@@ -458,10 +458,17 @@ impl Compiler {
         self.chunk.write_chunk(OpCode::NewMap as u8, 1);
         self.adjust_stack_usage(1);
         for i in map.initializers {
-            let c = self.chunk.add_constant(value::Value::String(i.name));
-            self.chunk.write_chunk(OpCode::Constant as u8, 1);
-            self.chunk.write_chunk(c, 1);
-            self.adjust_stack_usage(1);
+            match i.key {
+                parser::MapLHS::Name(s) => {
+                    let c = self.chunk.add_constant(value::Value::String(s));
+                    self.chunk.write_chunk(OpCode::Constant as u8, 1);
+                    self.chunk.write_chunk(c, 1);
+                    self.adjust_stack_usage(1);
+                }
+                parser::MapLHS::Expression(e) => {
+                    self.compile_expression(e);
+                }
+            }
 
             self.compile_expression(*i.value);
 
