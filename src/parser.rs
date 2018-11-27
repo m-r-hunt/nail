@@ -499,6 +499,8 @@ impl Parser {
         loop {
             if self.matches(&[TokenType::LeftBracket])? {
                 expression = self.finish_index(expression?);
+            } else if self.matches(&[TokenType::Dot])? {
+                expression = self.finish_dot(expression?);
             } else if self.matches(&[TokenType::LeftParen])? {
                 expression = self.finish_call(expression?);
             } else if self.matches(&[TokenType::Colon])? {
@@ -518,6 +520,19 @@ impl Parser {
         return Ok(Expression::Index(Index {
             indexer: Box::new(indexer),
             value: Box::new(value),
+        }));
+    }
+
+    fn finish_dot(&mut self, indexer: Expression) -> Result<Expression> {
+        let name = self.consume(
+            TokenType::Identifier,
+            "Expected identifier in '.' expression.",
+        )?;
+        let name = self.scanner.get_lexeme(&name);
+
+        return Ok(Expression::Index(Index {
+            indexer: Box::new(indexer),
+            value: Box::new(Expression::Literal(Literal::String(name))),
         }));
     }
 
