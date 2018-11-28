@@ -760,7 +760,12 @@ impl Parser {
                     'n' => c = '\n',
                     'r' => c = '\r',
                     't' => c = '\t',
-                    _ => return Err(ParserError("Unknown char literal escape".to_string(), self.previous().line)),
+                    _ => {
+                        return Err(ParserError(
+                            "Unknown char literal escape".to_string(),
+                            self.previous().line,
+                        ))
+                    }
                 }
             }
             return Ok(Expression::Literal(Literal::Char(c)));

@@ -492,7 +492,7 @@ impl Compiler {
         self.chunk.write_chunk(c, 1);
         self.adjust_stack_usage(1);
         self.chunk.write_chunk(OpCode::BuiltinCall as u8, 1);
-        self.adjust_stack_usage(-1 - (nargs as i8));
+        self.adjust_stack_usage(-2 - (nargs as i8));
         self.adjust_stack_usage(1);
     }
 
