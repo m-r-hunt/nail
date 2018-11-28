@@ -389,11 +389,19 @@ impl VM {
                         Value::ReferenceId(id) => {
                             let to_push;
                             {
-                                let ref_type = &self.heap[id];
+                                let ref_type = &mut self.heap[id];
                                 match ref_type {
-                                    ReferenceType::Array(a) => {
+                                    ReferenceType::Array(ref mut a) => {
                                         if builtin == "len" {
                                             to_push = Value::Number(a.len() as f64);
+                                        } else if builtin == "push" {
+                                            let value = {
+                                                // Hack, copied pop
+                                                self.stack_top -= 1;
+                                                self.stack[self.stack_top].clone()
+                                            };
+                                            a.push(value);
+                                            to_push = Value::Nil;
                                         } else {
                                             return Err(InterpreterError::RuntimeError(
                                                 "Unknown array builtin".to_string(),

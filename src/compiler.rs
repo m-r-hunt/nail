@@ -129,9 +129,11 @@ impl Compiler {
     }
 
     fn compile_let_statement(&mut self, let_statement: parser::LetStatement) {
-        let local_number = self.bind_local(let_statement.name);
-        let_statement.initializer.map(|expression| {
+        let opt = let_statement.initializer.map(|expression| {
             self.compile_expression(expression);
+        });
+        let local_number = self.bind_local(let_statement.name);
+        opt.map(|_| {
             self.chunk.write_chunk(OpCode::AssignLocal as u8, 1);
             self.chunk.write_chunk(local_number, 1);
             self.adjust_stack_usage(-1);
