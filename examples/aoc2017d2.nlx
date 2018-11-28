@@ -1,0 +1,51 @@
+fn main() {
+    let input = "d2input.txt":readFile();
+   
+    let spreadsheet = [];
+    let lines = input:split("\r\n");
+    for l in lines {
+        spreadsheet[l] = [];
+        let numbers = lines[l]:split("\t");
+        for n in numbers {
+       	    spreadsheet[l]:push(numbers[n]:parseNumber());
+        }
+    }
+
+    let checksum = 0;
+    for line in spreadsheet {
+    	let min = 9999;
+	let max = 0;
+	for n in spreadsheet[line] {
+	    let v = spreadsheet[line][n];
+	    if v < min {
+	       min = v;
+	    }
+	    if v > max {
+	       max = v;
+	    }
+	}
+	checksum += max - min;
+    }
+    print checksum;
+
+    let checksum2 = 0;
+    for line in spreadsheet {
+     	for n in spreadsheet[line] {
+	    let n_val = spreadsheet[line][n];
+	    for k in 0..spreadsheet[line]:len() {
+	    	if n == k {
+		   continue;
+		}
+	    	let k_val = spreadsheet[line][k];
+	    	if n_val % k_val == 0 {
+		   if n_val > k_val {
+		      checksum2 += n_val / k_val;
+		   } else {
+		      checksum2 += k_val / n_val;
+		   }
+		}
+	    }
+	}
+    }
+    print checksum2;
+}
