@@ -748,6 +748,7 @@ impl Parser {
             let t = self.previous();
             let s = self.scanner.get_lexeme(&t);
             let s = &s[1..s.len() - 1];
+            let s = s.replace("\\n", "\n").replace("\\t", "\t").replace("\\r", "\r");
             return Ok(Expression::Literal(Literal::String(s.to_string())));
         }
         if self.matches(&[TokenType::CharLiteral])? {

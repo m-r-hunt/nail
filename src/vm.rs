@@ -421,6 +421,21 @@ impl VM {
                         Value::String(s) => {
                             if builtin == "len" {
                                 self.push(Value::Number(s.len() as f64));
+                            } else if builtin == "readFile" {
+                                self.push(Value::String(std::fs::read_to_string(s).unwrap()));
+                            } else if builtin == "split" {
+                                let sep = self.pop();
+                                if let Value::String(sep) = sep {
+                                    let parts: Vec<_> = s.split(&sep).map(|p| {Value::String(p.to_string())}).collect();
+                                    let id = self.new_reference_type(ReferenceType::Array(parts));
+                                    self.push(Value::ReferenceId(id));
+                                } else {
+                                    return Err(InterpreterError::RuntimeError(
+                                        "Expected string argument to split".to_string(),
+                                    ));
+                                }
+                            } else if builtin == "parseNumber" {
+                                self.push(Value::Number(s.parse().unwrap()));
                             } else {
                                 return Err(InterpreterError::RuntimeError(
                                     "Unknown string builtin".to_string(),
