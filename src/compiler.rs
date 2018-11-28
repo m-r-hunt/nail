@@ -321,8 +321,8 @@ impl Compiler {
         let addr = self.chunk.code.len();
         self.insert_jump_address(jump_target_address, addr);
         self.adjust_stack_usage(-1);
-        match if_expression.else_block {
-            Some(b) => self.compile_block(b),
+        match if_expression.else_expression {
+            Some(e) => self.compile_expression(*e),
             None => {
                 self.chunk.write_chunk(OpCode::PushNil as u8, 1);
                 self.adjust_stack_usage(1);

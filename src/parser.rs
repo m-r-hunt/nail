@@ -64,7 +64,7 @@ pub struct BuiltinCall {
 pub struct If {
     pub condition: Box<Expression>,
     pub then_block: Block,
-    pub else_block: Option<Block>,
+    pub else_expression: Option<Box<Expression>>,
 }
 
 #[derive(Debug, Clone)]
@@ -581,14 +581,18 @@ impl Parser {
     fn if_expression(&mut self) -> Result<Expression> {
         let condition = Box::new(self.expression()?);
         let then_block = self.block()?;
-        let mut else_block = None;
+        let mut else_expression = None;
         if self.matches(&[TokenType::Else])? {
-            else_block = Some(self.block()?);
+            if self.matches(&[TokenType::If])? {
+                else_expression = Some(Box::new(self.if_expression()?));
+            } else {
+                else_expression = Some(Box::new(Expression::Block(self.block()?)));
+            }
         }
         return Ok(Expression::If(If {
             condition,
             then_block,
-            else_block,
+            else_expression,
         }));
     }
 
