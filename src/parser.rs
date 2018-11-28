@@ -749,7 +749,16 @@ impl Parser {
         if self.matches(&[TokenType::CharLiteral])? {
             let t = self.previous();
             let s = self.scanner.get_lexeme(&t);
-            let c = s.chars().collect::<Vec<char>>()[1];
+            let chars = s.chars().collect::<Vec<_>>();
+            let mut c = chars[1];
+            if c == '\\' {
+                match chars[2] {
+                    'n' => c = '\n',
+                    'r' => c = '\r',
+                    't' => c = '\t',
+                    _ => return Err(ParserError("Unknown char literal escape".to_string(), self.previous().line)),
+                }
+            }
             return Ok(Expression::Literal(Literal::Char(c)));
         }
         if self.matches(&[TokenType::Identifier])? {

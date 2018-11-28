@@ -312,6 +312,9 @@ impl Scanner {
     }
 
     fn char(&mut self) -> Result<Token> {
+        if self.peek() == '\\' {
+            self.advance();
+        }
         self.advance();
         if !(self.peek() == '\'') {
             return Err(ScannerError("Unterminated char literal.".to_string()));
