@@ -55,5 +55,11 @@ pub fn run_file(filename: &str) {
         }
     }
     let finished = Instant::now();
-    println!("Done. File read: {}s {}ms, Interpreted: {}s {}ms.", read_file_done.duration_since(start).as_secs(), read_file_done.duration_since(start).subsec_millis(), finished.duration_since(read_file_done).as_secs(), finished.duration_since(read_file_done).subsec_millis());
+    println!(
+        "Done. File read: {}s {}ms, Interpreted: {}s {}ms.",
+        read_file_done.duration_since(start).as_secs(),
+        read_file_done.duration_since(start).subsec_millis(),
+        finished.duration_since(read_file_done).as_secs(),
+        finished.duration_since(read_file_done).subsec_millis()
+    );
 }
