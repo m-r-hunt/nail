@@ -1,5 +1,6 @@
 use super::{chunk, compiler, debug, errors::NotloxError, value::*};
 use std::collections::HashMap;
+use std::time::Instant;
 
 const STACK_SIZE: usize = 256;
 
@@ -88,10 +89,21 @@ impl VM {
     }
 
     pub fn interpret(&mut self, source: &str) -> Result<Value, InterpreterError> {
+        let start = Instant::now();
         let chunk = compiler::compile(source)?;
+        let compiled = Instant::now();
         self.chunk = chunk;
         self.ip = self.chunk.lookup_function("main");
-        self.run()
+        let result = self.run();
+        let finished = Instant::now();
+        println!(
+            "VM Done. Compiled: {}s {}ms, Run: {}s {}ms.",
+            compiled.duration_since(start).as_secs(),
+            compiled.duration_since(start).subsec_millis(),
+            finished.duration_since(compiled).as_secs(),
+            finished.duration_since(compiled).subsec_millis()
+        );
+        result
     }
 
     pub fn run(&mut self) -> Result<Value, InterpreterError> {
