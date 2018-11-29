@@ -306,20 +306,23 @@ impl Compiler {
     }
 
     fn insert_jump_address(&mut self, jump_target_address: usize, dest_address: usize) {
-        let addr = (dest_address as isize - jump_target_address as isize - 1) as i8;
-        self.chunk.code[jump_target_address] = addr as u8;
+        let addr = (dest_address as isize - jump_target_address as isize - 2) as i16;
+        self.chunk.code[jump_target_address] = (addr & 0xFF) as u8;
+        self.chunk.code[jump_target_address + 1] = (addr >> 8) as u8;
     }
 
     fn compile_if(&mut self, if_expression: parser::If) {
         self.compile_expression(*if_expression.condition);
         self.chunk.write_chunk(OpCode::JumpIfFalse as u8, 1);
         self.chunk.write_chunk(0, 1);
+        self.chunk.write_chunk(0, 1);
         self.adjust_stack_usage(-1);
-        let jump_target_address = self.chunk.code.len() - 1;
+        let jump_target_address = self.chunk.code.len() - 2;
         self.compile_block(if_expression.then_block);
         self.chunk.write_chunk(OpCode::Jump as u8, 1);
         self.chunk.write_chunk(0, 1);
-        let else_target_address = self.chunk.code.len() - 1;
+        self.chunk.write_chunk(0, 1);
+        let else_target_address = self.chunk.code.len() - 2;
         let addr = self.chunk.code.len();
         self.insert_jump_address(jump_target_address, addr);
         self.adjust_stack_usage(-1);
@@ -339,6 +342,7 @@ impl Compiler {
         self.compile_expression(*while_expression.condition);
         self.chunk.write_chunk(OpCode::JumpIfFalse as u8, 1);
         self.chunk.write_chunk(0, 1);
+        self.chunk.write_chunk(0, 1);
         self.adjust_stack_usage(-1);
         self.push_loop_context(while_start_address, false);
         let jump_target_address = self.chunk.code.len() - 1;
@@ -347,8 +351,9 @@ impl Compiler {
         self.adjust_stack_usage(-1);
         self.chunk.write_chunk(OpCode::Jump as u8, 1);
         self.chunk.write_chunk(0, 1);
+        self.chunk.write_chunk(0, 1);
         let current_address = self.chunk.code.len();
-        self.insert_jump_address(current_address - 1, while_start_address);
+        self.insert_jump_address(current_address - 2, while_start_address);
         self.insert_jump_address(jump_target_address, current_address);
         self.pop_loop_context(current_address);
         self.chunk.write_chunk(OpCode::PushNil as u8, 1);
@@ -368,7 +373,8 @@ impl Compiler {
         let local_n = self.bind_local(for_expression.variable);
         self.chunk.write_chunk(local_n, 1);
         self.chunk.write_chunk(0, 1);
-        let for_jump_target_address = self.chunk.code.len() - 1;
+        self.chunk.write_chunk(0, 1);
+        let for_jump_target_address = self.chunk.code.len() - 2;
         self.push_loop_context(for_start_address, true);
 
         if let Some(variable2) = for_expression.variable2 {
@@ -387,8 +393,9 @@ impl Compiler {
         self.adjust_stack_usage(-1);
         self.chunk.write_chunk(OpCode::Jump as u8, 1);
         self.chunk.write_chunk(0, 1);
+        self.chunk.write_chunk(0, 1);
         let current_address = self.chunk.code.len();
-        self.insert_jump_address(current_address - 1, for_start_address);
+        self.insert_jump_address(current_address - 2, for_start_address);
         self.insert_jump_address(for_jump_target_address, current_address);
         self.chunk.write_chunk(OpCode::PushNil as u8, 1);
         self.pop_loop_context(current_address);
@@ -402,8 +409,9 @@ impl Compiler {
         self.adjust_stack_usage(-1);
         self.chunk.write_chunk(OpCode::Jump as u8, 1);
         self.chunk.write_chunk(0, 1);
+        self.chunk.write_chunk(0, 1);
         let current_address = self.chunk.code.len();
-        self.insert_jump_address(current_address - 1, loop_start_address);
+        self.insert_jump_address(current_address - 2, loop_start_address);
         self.pop_loop_context(current_address);
         self.chunk.write_chunk(OpCode::PushNil as u8, 1);
         self.adjust_stack_usage(1);
@@ -545,7 +553,8 @@ impl Compiler {
         }
         self.chunk.write_chunk(OpCode::Jump as u8, 1);
         self.chunk.write_chunk(0, 1);
-        let jump_target_address = self.chunk.code.len() - 1;
+        self.chunk.write_chunk(0, 1);
+        let jump_target_address = self.chunk.code.len() - 2;
         let continue_address = self.loop_contexts.last().unwrap().continue_address;
         self.insert_jump_address(jump_target_address, continue_address);
         self.adjust_stack_usage(1); // Logically this should be an expression returning a value, but it doesn't return.
@@ -563,11 +572,12 @@ impl Compiler {
         }
         self.chunk.write_chunk(OpCode::Jump as u8, 1);
         self.chunk.write_chunk(0, 1);
+        self.chunk.write_chunk(0, 1);
         self.loop_contexts
             .last_mut()
             .unwrap()
             .breaks
-            .push(self.chunk.code.len() - 1);
+            .push(self.chunk.code.len() - 2);
         self.adjust_stack_usage(1); // Logically this should be an expression returning a value, but it doesn't return.
     }
 }

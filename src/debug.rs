@@ -41,8 +41,10 @@ pub fn disassemble_instruction(chunk: &Chunk, offset: usize) -> usize {
         Some(OpCode::FunctionEntry) => number_instruction("OP_FN_ENTRY", &chunk, offset),
         Some(OpCode::Call) => number_instruction("OP_CALL", &chunk, offset),
 
-        Some(OpCode::JumpIfFalse) => signed_number_instruction("OP_JUMP_IF_FALSE", &chunk, offset),
-        Some(OpCode::Jump) => signed_number_instruction("OP_JUMP", &chunk, offset),
+        Some(OpCode::JumpIfFalse) => {
+            signed_number_16_instruction("OP_JUMP_IF_FALSE", &chunk, offset)
+        }
+        Some(OpCode::Jump) => signed_number_16_instruction("OP_JUMP", &chunk, offset),
 
         Some(OpCode::TestLess) => simple_instruction("OP_TEST_LESS", offset),
         Some(OpCode::TestLessOrEqual) => simple_instruction("OP_TEST_LESS_OR_EQUAL", offset),
@@ -101,15 +103,25 @@ fn number_instruction(name: &str, chunk: &Chunk, offset: usize) -> usize {
     return offset + 2;
 }
 
-fn signed_number_instruction(name: &str, chunk: &Chunk, offset: usize) -> usize {
+fn signed_number_16_instruction(name: &str, chunk: &Chunk, offset: usize) -> usize {
     let number = chunk.code[offset + 1];
-    println!("{} {}", name, number as i8);
-    return offset + 2;
+    let number2 = chunk.code[offset + 2];
+    println!(
+        "{} {}",
+        name,
+        (number as usize | (number2 as usize) << 8) as i16
+    );
+    return offset + 3;
 }
 
 fn for_instruction(chunk: &Chunk, offset: usize) -> usize {
     let local = chunk.code[offset + 1];
     let jump_target = chunk.code[offset + 2];
-    println!("OP_FOR_LOOP l={} jt={}", local, jump_target as i8);
-    return offset + 3;
+    let jump_target2 = chunk.code[offset + 3];
+    println!(
+        "OP_FOR_LOOP l={} jt={}",
+        local,
+        (jump_target as usize | (jump_target2 as usize) << 8) as i16
+    );
+    return offset + 4;
 }

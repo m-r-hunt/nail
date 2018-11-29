@@ -1,0 +1,34 @@
+fn main() {
+   let a = 1;
+   loop {
+       if a >= 2 {
+           break;
+       }
+
+       // A bunch of garbage to make sure we have >= 128 bytecodes in the body of this loop.
+       let foo = #{foo: 2, bar: 17, baz: 23};
+       print foo;
+       print foo.foo;
+       print foo.bar;
+       print foo.baz;
+       let foo = #{foo: 2, bar: 17, baz: 23};
+       print foo;
+       print foo.foo;
+       print foo.bar;
+       print foo.baz;
+       let foo = #{foo: 2, bar: 17, baz: 23};
+       print foo;
+       print foo.foo;
+       print foo.bar;
+       print foo.baz;
+       let foo = #{foo: 2, bar: 17, baz: 23};
+       print foo;
+       print foo.foo;
+       print foo.bar;
+       print foo.baz;
+       // Garbage end.
+
+       a += 1;
+       continue;
+   }
+}

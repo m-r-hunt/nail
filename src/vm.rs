@@ -219,15 +219,15 @@ impl VM {
                 }
 
                 Some(chunk::OpCode::JumpIfFalse) => {
-                    let target = self.read_signed_byte();
+                    let target = self.read_signed_16();
                     let value = self.pop();
                     if value.is_falsey() {
-                        self.ip += target as usize;
+                        self.ip = (self.ip as isize + target as isize) as usize;
                     }
                 }
                 Some(chunk::OpCode::Jump) => {
-                    let target = self.read_signed_byte() as isize;
-                    self.ip = (self.ip as isize + target) as usize;
+                    let target = self.read_signed_16();
+                    self.ip = (self.ip as isize + target as isize) as usize;
                 }
 
                 Some(chunk::OpCode::TestLess) => binary_op!(self, <, Number, Boolean),
@@ -474,7 +474,8 @@ impl VM {
 
                 Some(chunk::OpCode::ForLoop) => {
                     let local_n = self.read_byte();
-                    let jump_target = self.read_signed_byte();
+                    let jump_target = self.read_signed_16();
+                    let target_ip = (self.ip as isize + jump_target as isize) as usize;
                     let range = self.pop();
                     match range {
                         Value::Range(l, r) => {
@@ -482,7 +483,7 @@ impl VM {
                                 self.locals[local_n as usize + self.locals_base] = Value::Number(l);
                                 self.push(Value::Range(l + 1.0, r));
                             } else {
-                                self.ip = (self.ip as isize + jump_target as isize) as usize;
+                                self.ip = target_ip;
                             }
                         }
                         Value::ReferenceId(id) => {
@@ -496,8 +497,7 @@ impl VM {
                                                 Value::Number(0.0);
                                             to_push = Some(Value::Range(1.0, a.len() as f64));
                                         } else {
-                                            self.ip =
-                                                (self.ip as isize + jump_target as isize) as usize;
+                                            self.ip = target_ip;
                                         }
                                     }
                                     ReferenceType::Map(m) => {
@@ -509,8 +509,7 @@ impl VM {
                                             to_push =
                                                 Some(Value::MapForContext(keys, 1.0, len as f64));
                                         } else {
-                                            self.ip =
-                                                (self.ip as isize + jump_target as isize) as usize;
+                                            self.ip = target_ip;
                                         }
                                     }
                                     _ => {
@@ -602,6 +601,12 @@ impl VM {
 
     pub fn read_signed_byte(&mut self) -> i8 {
         self.read_byte() as i8
+    }
+
+    pub fn read_signed_16(&mut self) -> i16 {
+        let number = self.read_byte() as usize;
+        let number2 = self.read_byte() as usize;
+        (number | number2 << 8) as i16
     }
 
     pub fn read_constant(&mut self) -> Value {
