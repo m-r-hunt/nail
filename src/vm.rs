@@ -12,11 +12,11 @@ struct CallFrame {
 pub struct VM {
     chunk: chunk::Chunk,
     ip: usize,
-    stack: [Value; STACK_SIZE],
+    stack: Vec<Value>,
     stack_top: usize,
-    return_stack: [CallFrame; 256],
+    return_stack: [CallFrame; STACK_SIZE],
     return_stack_top: usize,
-    locals: [Value; 256],
+    locals: Vec<Value>,
     locals_base: usize,
     locals_top: usize,
     heap: Vec<ReferenceType>,
@@ -67,13 +67,8 @@ macro_rules! binary_op {
 
 impl VM {
     pub fn new() -> VM {
-        let array = unsafe {
-            let mut array: [Value; STACK_SIZE] = std::mem::uninitialized();
-            for i in 0..STACK_SIZE {
-                array[i] = Value::Nil;
-            }
-            array
-        };
+        let mut array = Vec::new();
+        array.resize(STACK_SIZE, Value::Nil);
 
         VM {
             chunk: chunk::Chunk::new(),
@@ -83,7 +78,7 @@ impl VM {
             return_stack: [CallFrame {
                 return_address: 0,
                 locals_base: 0,
-            }; 256],
+            }; STACK_SIZE],
             return_stack_top: 0,
             locals: array,
             locals_base: 0,
