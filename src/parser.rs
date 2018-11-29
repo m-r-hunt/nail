@@ -76,6 +76,7 @@ pub struct While {
 #[derive(Debug, Clone)]
 pub struct For {
     pub variable: String,
+    pub variable2: Option<String>,
     pub range: Box<Expression>,
     pub block: Block,
 }
@@ -605,11 +606,20 @@ impl Parser {
     fn for_expression(&mut self) -> Result<Expression> {
         let variable = self.consume(TokenType::Identifier, "Expected identifier in for loop")?;
         let variable = self.scanner.get_lexeme(&variable);
+        let mut variable2 = None;
+        if self.matches(&[TokenType::Comma])? {
+            let variable2t = self.consume(
+                TokenType::Identifier,
+                "Expected second identifier in for loop",
+            )?;
+            variable2 = Some(self.scanner.get_lexeme(&variable2t));
+        }
         self.consume(TokenType::In, "Expected 'in' in for loop.")?;
         let range = self.expression()?;
         let block = self.block()?;
         return Ok(Expression::For(For {
             variable,
+            variable2,
             range: Box::new(range),
             block,
         }));
@@ -748,7 +758,10 @@ impl Parser {
             let t = self.previous();
             let s = self.scanner.get_lexeme(&t);
             let s = &s[1..s.len() - 1];
-            let s = s.replace("\\n", "\n").replace("\\t", "\t").replace("\\r", "\r");
+            let s = s
+                .replace("\\n", "\n")
+                .replace("\\t", "\t")
+                .replace("\\r", "\r");
             return Ok(Expression::Literal(Literal::String(s.to_string())));
         }
         if self.matches(&[TokenType::CharLiteral])? {

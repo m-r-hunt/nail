@@ -426,7 +426,10 @@ impl VM {
                             } else if builtin == "split" {
                                 let sep = self.pop();
                                 if let Value::String(sep) = sep {
-                                    let parts: Vec<_> = s.split(&sep).map(|p| {Value::String(p.to_string())}).collect();
+                                    let parts: Vec<_> = s
+                                        .split(&sep)
+                                        .map(|p| Value::String(p.to_string()))
+                                        .collect();
                                     let id = self.new_reference_type(ReferenceType::Array(parts));
                                     self.push(Value::ReferenceId(id));
                                 } else {

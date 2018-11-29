@@ -357,6 +357,12 @@ impl Compiler {
 
     fn compile_for(&mut self, for_expression: parser::For) {
         self.compile_expression(*for_expression.range);
+        let for_local_n = self.bind_local("_for_loop_range".to_string());
+        self.chunk.write_chunk(OpCode::AssignLocal as u8, 1);
+        self.chunk.write_chunk(for_local_n, 1);
+        self.chunk.write_chunk(OpCode::LoadLocal as u8, 1);
+        self.chunk.write_chunk(for_local_n, 1);
+
         let for_start_address = self.chunk.code.len();
         self.chunk.write_chunk(OpCode::ForLoop as u8, 1);
         let local_n = self.bind_local(for_expression.variable);
@@ -364,6 +370,18 @@ impl Compiler {
         self.chunk.write_chunk(0, 1);
         let for_jump_target_address = self.chunk.code.len() - 1;
         self.push_loop_context(for_start_address, true);
+
+        if let Some(variable2) = for_expression.variable2 {
+            let local2_n = self.bind_local(variable2);
+            self.chunk.write_chunk(OpCode::LoadLocal as u8, 1);
+            self.chunk.write_chunk(for_local_n, 1);
+            self.chunk.write_chunk(OpCode::LoadLocal as u8, 1);
+            self.chunk.write_chunk(local_n, 1);
+            self.chunk.write_chunk(OpCode::Index as u8, 1);
+            self.chunk.write_chunk(OpCode::AssignLocal as u8, 1);
+            self.chunk.write_chunk(local2_n as u8, 1);
+        }
+
         self.compile_block(for_expression.block);
         self.chunk.write_chunk(OpCode::Pop as u8, 1);
         self.adjust_stack_usage(-1);
