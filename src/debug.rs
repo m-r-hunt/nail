@@ -76,6 +76,8 @@ pub fn disassemble_instruction(chunk: &Chunk, offset: usize) -> usize {
         Some(OpCode::NewMap) => simple_instruction("OP_NEW_MAP", offset),
         Some(OpCode::PushMap) => simple_instruction("OP_PUSH_MAP", offset),
 
+        Some(OpCode::Not) => simple_instruction("OP_NOT", offset),
+
         None => {
             println!("Unknown opcode {}", instr);
             offset + 1

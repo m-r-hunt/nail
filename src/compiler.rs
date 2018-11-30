@@ -239,6 +239,7 @@ impl Compiler {
         self.compile_expression(*unary.expression);
         match unary.operator.token_type {
             TokenType::Minus => self.chunk.write_chunk(OpCode::Negate as u8, 1),
+            TokenType::Bang => self.chunk.write_chunk(OpCode::Not as u8, 1),
             _ => panic!("Unimplemented unary operator"),
         }
     }

@@ -1,0 +1,24 @@
+fn main() {
+    let lines = "d4input.txt":readFile():split("\n");
+    let total_valid = 0;
+    for _, line in lines {
+        if line:len() == 0 {
+       	    continue;
+        }
+        let words = line:split(" ");
+        let valid_pw = true;
+        for w1 in words {
+       	    for w2 in w1+1..words:len() {
+	        if words[w1] == words[w2] {
+	       	    valid_pw = false;
+		    break;
+	        }
+	    }
+	    if !valid_pw {
+	        break;
+	    }
+        }
+        total_valid += if valid_pw { 1 } else { 0 };
+    }
+    print total_valid;
+}

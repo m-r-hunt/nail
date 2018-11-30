@@ -241,8 +241,17 @@ impl VM {
                 Some(chunk::OpCode::TestLessOrEqual) => binary_op!(self, <=, Number, Boolean),
                 Some(chunk::OpCode::TestGreater) => binary_op!(self, >, Number, Boolean),
                 Some(chunk::OpCode::TestGreaterOrEqual) => binary_op!(self, >=, Number, Boolean),
-                Some(chunk::OpCode::TestEqual) => binary_op!(self, ==, Number, Boolean),
-                Some(chunk::OpCode::TestNotEqual) => binary_op!(self, !=, Number, Boolean),
+
+                Some(chunk::OpCode::TestEqual) => {
+                    let a = self.pop();
+                    let b = self.pop();
+                    self.push(Value::Boolean(a == b));
+                }
+                Some(chunk::OpCode::TestNotEqual) => {
+                    let a = self.pop();
+                    let b = self.pop();
+                    self.push(Value::Boolean(a != b));
+                }
 
                 Some(chunk::OpCode::Index) => {
                     let the_value = self.pop();
@@ -590,6 +599,11 @@ impl VM {
                             "Map push on non-map".to_string(),
                         ));
                     }
+                }
+
+                Some(chunk::OpCode::Not) => {
+                    let value = self.pop();
+                    self.push(Value::Boolean(value.is_falsey()));
                 }
 
                 None => {
