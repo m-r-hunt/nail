@@ -1,0 +1,32 @@
+fn main() {
+    let input = "d1input.txt":readFile();
+    let lines = input:split("\n");
+    let freqs = [];
+    for _, line in lines {
+        if line:len() == 0 {
+            continue;
+        }
+        let freq = line:parseNumber();
+        freqs:push(freq);
+    }
+
+    let total_freq = 0;
+    for _, freq in freqs {
+        total_freq += freq;
+    }
+    print total_freq;
+
+    let reached_freqs = #{};
+    let f = -1;
+    let total_freq = 0;
+    loop {
+        f = (f + 1) % freqs:len();
+        let freq = freqs[f];
+        total_freq += freq;
+        if reached_freqs[total_freq] {
+            print total_freq;
+            break;
+        }
+        reached_freqs[total_freq] = true;
+    }
+}
