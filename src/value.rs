@@ -20,11 +20,12 @@ pub struct SanitizedFloat {
 }
 
 impl SanitizedFloat {
-    fn try_from(value: f64) -> Result<Self, InterpreterError> {
+    fn try_from(value: f64, line: usize) -> Result<Self, InterpreterError> {
         use num::Float;
         if !value.is_finite() {
             return Err(InterpreterError::RuntimeError(
                 "Tried to hash bad float.".to_string(),
+                line,
             ));
         } else {
             let (mantissa, exponent, sign) = value.integer_decode();
@@ -55,19 +56,20 @@ pub enum HashableValue {
 }
 
 impl HashableValue {
-    pub fn try_from(value: Value) -> Result<Self, InterpreterError> {
+    pub fn try_from(value: Value, line: usize) -> Result<Self, InterpreterError> {
         match value {
             Value::Nil => Ok(HashableValue::Nil),
-            Value::Number(f) => Ok(HashableValue::Number(SanitizedFloat::try_from(f)?)),
+            Value::Number(f) => Ok(HashableValue::Number(SanitizedFloat::try_from(f, line)?)),
             Value::Boolean(b) => Ok(HashableValue::Boolean(b)),
             Value::String(s) => Ok(HashableValue::String(s)),
             Value::ReferenceId(i) => Ok(HashableValue::ReferenceId(i)),
             Value::Range(l, r) => Ok(HashableValue::Range(
-                SanitizedFloat::try_from(l)?,
-                SanitizedFloat::try_from(r)?,
+                SanitizedFloat::try_from(l, line)?,
+                SanitizedFloat::try_from(r, line)?,
             )),
             Value::MapForContext(..) => Err(InterpreterError::RuntimeError(
                 "Tried to hash map for context, this should never happen.".to_string(),
+                line,
             )),
         }
     }

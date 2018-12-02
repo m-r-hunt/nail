@@ -26,7 +26,7 @@ pub struct VM {
 #[derive(Debug)]
 pub enum InterpreterError {
     CompileError(NotloxError),
-    RuntimeError(String),
+    RuntimeError(String, usize),
 }
 
 impl From<NotloxError> for InterpreterError {
@@ -39,7 +39,9 @@ impl std::fmt::Display for InterpreterError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             InterpreterError::CompileError(c) => c.fmt(f),
-            InterpreterError::RuntimeError(s) => write!(f, "Runtime Error: {}", s),
+            InterpreterError::RuntimeError(s, line) => {
+                write!(f, "Runtime Error, line {}: {}", line, s)
+            }
         }
     }
 }
@@ -47,19 +49,19 @@ impl std::fmt::Display for InterpreterError {
 impl std::error::Error for InterpreterError {}
 
 macro_rules! binary_op {
-    ( $self:expr, $op:tt, $type: ident, $ret:ident ) => {
+    ( $self:expr, $op:tt, $type: ident, $ret:ident, $line:expr ) => {
         {
             let mut b;
             if let Value::$type(bval) = $self.pop() {
                 b = bval;
             } else {
-                return Err(InterpreterError::RuntimeError("Bad argument to binary operator, not a number.".to_string()));
+                return Err(InterpreterError::RuntimeError("Bad argument to binary operator, not a number.".to_string(), $line));
             }
             let mut a;
             if let Value::$type(aval) = $self.pop() {
                 a = aval;
             } else {
-                return Err(InterpreterError::RuntimeError("Bad argument to binary operator, not a number.".to_string()));
+                return Err(InterpreterError::RuntimeError("Bad argument to binary operator, not a number.".to_string(), $line));
             }
             $self.push(Value::$ret(a $op b))
         }
@@ -119,6 +121,7 @@ impl VM {
                 use std::io::Read;
                 std::io::stdin().read(&mut buf).unwrap();
             }
+            let current_line = self.chunk.lines[self.ip];
             let instruction = self.read_byte();
             match chunk::OpCode::try_from(instruction) {
                 Some(chunk::OpCode::Return) => {
@@ -144,6 +147,7 @@ impl VM {
                     } else {
                         return Err(InterpreterError::RuntimeError(
                             "Bad argument to unary operator, not a number.".to_string(),
+                            current_line,
                         ));
                     }
                 }
@@ -151,7 +155,7 @@ impl VM {
                 Some(chunk::OpCode::Add) => {
                     let top = self.peek();
                     if let Value::Number(_) = top {
-                        binary_op!(self, +, Number, Number)
+                        binary_op!(self, +, Number, Number, current_line)
                     } else if let Value::String(_) = top {
                         let mut b;
                         if let Value::String(bval) = self.pop() {
@@ -159,6 +163,7 @@ impl VM {
                         } else {
                             return Err(InterpreterError::RuntimeError(
                                 "Bad argument to binary operator, not a string.".to_string(),
+                                current_line,
                             ));
                         }
                         let mut a;
@@ -167,19 +172,21 @@ impl VM {
                         } else {
                             return Err(InterpreterError::RuntimeError(
                                 "Bad argument to binary operator, not a number.".to_string(),
+                                current_line,
                             ));
                         }
                         self.push(Value::String(a + &b))
                     } else {
                         return Err(InterpreterError::RuntimeError(
                             "Bad or mismatched arguments to +".to_string(),
+                            current_line,
                         ));
                     }
                 }
-                Some(chunk::OpCode::Subtract) => binary_op!(self, -, Number, Number),
-                Some(chunk::OpCode::Multiply) => binary_op!(self, *, Number, Number),
-                Some(chunk::OpCode::Divide) => binary_op!(self, /, Number, Number),
-                Some(chunk::OpCode::Remainder) => binary_op!(self, %, Number, Number),
+                Some(chunk::OpCode::Subtract) => binary_op!(self, -, Number, Number, current_line),
+                Some(chunk::OpCode::Multiply) => binary_op!(self, *, Number, Number, current_line),
+                Some(chunk::OpCode::Divide) => binary_op!(self, /, Number, Number, current_line),
+                Some(chunk::OpCode::Remainder) => binary_op!(self, %, Number, Number, current_line),
 
                 Some(chunk::OpCode::Print) => println!("{}", self.pop()),
 
@@ -188,6 +195,7 @@ impl VM {
                     if number >= self.locals_top {
                         return Err(InterpreterError::RuntimeError(
                             "Local store out of range".to_string(),
+                            current_line,
                         ));
                     }
                     self.locals[number as usize] = self.pop();
@@ -197,6 +205,7 @@ impl VM {
                     if number >= self.locals_top {
                         return Err(InterpreterError::RuntimeError(
                             "Local load out of range".to_string(),
+                            current_line,
                         ));
                     }
                     let value = self.locals[number as usize].clone();
@@ -237,10 +246,16 @@ impl VM {
                     self.ip = (self.ip as isize + target as isize) as usize;
                 }
 
-                Some(chunk::OpCode::TestLess) => binary_op!(self, <, Number, Boolean),
-                Some(chunk::OpCode::TestLessOrEqual) => binary_op!(self, <=, Number, Boolean),
-                Some(chunk::OpCode::TestGreater) => binary_op!(self, >, Number, Boolean),
-                Some(chunk::OpCode::TestGreaterOrEqual) => binary_op!(self, >=, Number, Boolean),
+                Some(chunk::OpCode::TestLess) => binary_op!(self, <, Number, Boolean, current_line),
+                Some(chunk::OpCode::TestLessOrEqual) => {
+                    binary_op!(self, <=, Number, Boolean, current_line)
+                }
+                Some(chunk::OpCode::TestGreater) => {
+                    binary_op!(self, >, Number, Boolean, current_line)
+                }
+                Some(chunk::OpCode::TestGreaterOrEqual) => {
+                    binary_op!(self, >=, Number, Boolean, current_line)
+                }
 
                 Some(chunk::OpCode::TestEqual) => {
                     let a = self.pop();
@@ -264,6 +279,7 @@ impl VM {
                             } else {
                                 return Err(InterpreterError::RuntimeError(
                                     "Index must be number.".to_string(),
+                                    current_line,
                                 ));
                             }
                             // Todo: Make this better and maybe utf8 safe.
@@ -283,6 +299,7 @@ impl VM {
                                         } else {
                                             return Err(InterpreterError::RuntimeError(
                                                 "Index must be number.".to_string(),
+                                                current_line,
                                             ));
                                         }
                                         if v >= a.len() {
@@ -292,13 +309,15 @@ impl VM {
                                     }
                                     ReferenceType::Map(m) => {
                                         let hashable_value =
-                                            HashableValue::try_from(the_value).unwrap();
+                                            HashableValue::try_from(the_value, current_line)
+                                                .unwrap();
                                         to_push =
                                             m.get(&hashable_value).unwrap_or(&Value::Nil).clone();
                                     }
                                     _ => {
                                         return Err(InterpreterError::RuntimeError(
                                             "Don't know how to index that.".to_string(),
+                                            current_line,
                                         ));
                                     }
                                 }
@@ -309,6 +328,7 @@ impl VM {
                         _ => {
                             return Err(InterpreterError::RuntimeError(
                                 "Don't know how to index that.".to_string(),
+                                current_line,
                             ));
                         }
                     }
@@ -333,6 +353,7 @@ impl VM {
                                     _ => {
                                         return Err(InterpreterError::RuntimeError(
                                             "Array push on non-array".to_string(),
+                                            current_line,
                                         ));
                                     }
                                 }
@@ -342,6 +363,7 @@ impl VM {
                         _ => {
                             return Err(InterpreterError::RuntimeError(
                                 "Array push on non-array".to_string(),
+                                current_line,
                             ));
                         }
                     }
@@ -362,6 +384,7 @@ impl VM {
                                     } else {
                                         return Err(InterpreterError::RuntimeError(
                                             "Index must be number.".to_string(),
+                                            current_line,
                                         ));
                                     }
                                     if n >= a.len() {
@@ -370,12 +393,16 @@ impl VM {
                                     a[n] = new_value;
                                 }
                                 ReferenceType::Map(ref mut m) => {
-                                    m.insert(HashableValue::try_from(index_value)?, new_value);
+                                    m.insert(
+                                        HashableValue::try_from(index_value, current_line)?,
+                                        new_value,
+                                    );
                                 }
 
                                 _ => {
                                     return Err(InterpreterError::RuntimeError(
                                         "Don't know how to index assign that".to_string(),
+                                        current_line,
                                     ));
                                 }
                             }
@@ -384,6 +411,7 @@ impl VM {
                         _ => {
                             return Err(InterpreterError::RuntimeError(
                                 "Don't know how to index assign that".to_string(),
+                                current_line,
                             ));
                         }
                     }
@@ -397,6 +425,7 @@ impl VM {
                     } else {
                         return Err(InterpreterError::RuntimeError(
                             "Expected builtin name".to_string(),
+                            current_line,
                         ));
                     };
 
@@ -421,12 +450,14 @@ impl VM {
                                         } else {
                                             return Err(InterpreterError::RuntimeError(
                                                 "Unknown array builtin".to_string(),
+                                                current_line,
                                             ));
                                         }
                                     }
                                     _ => {
                                         return Err(InterpreterError::RuntimeError(
                                             "Unknown builtin".to_string(),
+                                            current_line,
                                         ))
                                     }
                                 }
@@ -451,6 +482,7 @@ impl VM {
                                 } else {
                                     return Err(InterpreterError::RuntimeError(
                                         "Expected string argument to split".to_string(),
+                                        current_line,
                                     ));
                                 }
                             } else if builtin == "parseNumber" {
@@ -458,6 +490,7 @@ impl VM {
                             } else {
                                 return Err(InterpreterError::RuntimeError(
                                     "Unknown string builtin".to_string(),
+                                    current_line,
                                 ));
                             }
                         }
@@ -465,6 +498,7 @@ impl VM {
                         _ => {
                             return Err(InterpreterError::RuntimeError(
                                 "Unknown builtin".to_string(),
+                                current_line,
                             ))
                         }
                     }
@@ -476,6 +510,7 @@ impl VM {
                     } else {
                         return Err(InterpreterError::RuntimeError(
                             "Expected number in range bounds".to_string(),
+                            current_line,
                         ));
                     };
                     let left = if let Value::Number(n) = self.pop() {
@@ -483,6 +518,7 @@ impl VM {
                     } else {
                         return Err(InterpreterError::RuntimeError(
                             "Expected number in range bounds".to_string(),
+                            current_line,
                         ));
                     };
                     self.push(Value::Range(left, right))
@@ -531,6 +567,7 @@ impl VM {
                                     _ => {
                                         return Err(InterpreterError::RuntimeError(
                                             "Don't know how to for over that".to_string(),
+                                            current_line,
                                         ))
                                     }
                                 }
@@ -555,6 +592,7 @@ impl VM {
                         _ => {
                             return Err(InterpreterError::RuntimeError(
                                 "Don't know how to for over that".to_string(),
+                                current_line,
                             ))
                         }
                     }
@@ -586,10 +624,11 @@ impl VM {
                         {
                             let map = &mut self.heap[id];
                             if let ReferenceType::Map(ref mut m) = map {
-                                m.insert(HashableValue::try_from(key)?, value);
+                                m.insert(HashableValue::try_from(key, current_line)?, value);
                             } else {
                                 return Err(InterpreterError::RuntimeError(
                                     "Map push on non-map".to_string(),
+                                    current_line,
                                 ));
                             }
                         }
@@ -597,6 +636,7 @@ impl VM {
                     } else {
                         return Err(InterpreterError::RuntimeError(
                             "Map push on non-map".to_string(),
+                            current_line,
                         ));
                     }
                 }
@@ -609,6 +649,7 @@ impl VM {
                 None => {
                     return Err(InterpreterError::RuntimeError(
                         "Bad instruction".to_string(),
+                        current_line,
                     ))
                 }
             }
