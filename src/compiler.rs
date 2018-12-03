@@ -276,6 +276,7 @@ impl Compiler {
             TokenType::BangEqual => self
                 .chunk
                 .write_chunk(OpCode::TestNotEqual as u8, binary.line),
+            TokenType::AmpersandAmpersand => self.chunk.write_chunk(OpCode::And as u8, binary.line),
             _ => panic!("Unimplemented binary operator"),
         }
         self.adjust_stack_usage(-1);
@@ -368,7 +369,7 @@ impl Compiler {
         self.chunk.write_chunk(0, while_expression.line);
         self.adjust_stack_usage(-1);
         self.push_loop_context(while_start_address, false);
-        let jump_target_address = self.chunk.code.len() - 1;
+        let jump_target_address = self.chunk.code.len() - 2;
         self.compile_block(while_expression.block);
         self.chunk
             .write_chunk(OpCode::Pop as u8, while_expression.line);

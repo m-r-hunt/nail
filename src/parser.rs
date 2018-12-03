@@ -423,7 +423,7 @@ impl Parser {
     }
 
     fn assignment(&mut self) -> Result<Expression> {
-        let mut expr = self.equality()?;
+        let mut expr = self.and()?;
         while self.matches(&[TokenType::Equal])? {
             let line = self.previous().line;
             let value = self.expression()?;
@@ -449,6 +449,21 @@ impl Parser {
                     ))
                 }
             }
+        }
+        return Ok(expr);
+    }
+
+    fn and(&mut self) -> Result<Expression> {
+        let mut expr = self.equality()?;
+        while self.matches(&[TokenType::AmpersandAmpersand])? {
+            let operator = self.previous();
+            let right = self.equality()?;
+            expr = Expression::Binary(Binary {
+                left: Box::new(expr),
+                operator,
+                right: Box::new(right),
+                line: operator.line,
+            });
         }
         return Ok(expr);
     }

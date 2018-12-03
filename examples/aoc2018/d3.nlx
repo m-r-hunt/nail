@@ -1,0 +1,83 @@
+fn main() {
+    let grid = [];
+    let claims = [];
+    let overlapped = [];
+    for i in 0..1500 {
+        grid[i] = [];
+        claims[i] = [];
+        for j in 0..1500 {
+            grid[i][j] = 0;
+            claims[i][j] = 0;
+        }
+    }
+
+    let input = "d3input.txt":readFile():split("\n");
+    for _, line in input {
+        if line:len() == 0 {
+            continue;
+        }
+
+        let i = 1; // Skip #
+        let id = 0;
+        while line[i] >= '0' && line[i] <= '9' {
+            id *= 10;
+            id += line[i] - '0';
+            i += 1;
+        }
+
+        i += 3; // Skip " @ "
+        let x = 0;
+        while line[i] >= '0' && line[i] <= '9' {
+            x *= 10;
+            x += line[i] - '0';
+            i += 1;
+        }
+
+        i += 1;
+        let y = 0;
+        while line[i] >= '0' && line[i] <= '9' {
+            y *= 10;
+            y += line[i] - '0';
+            i += 1;
+        }
+
+        i += 2;
+        let w = 0;
+        while line[i] >= '0' && line[i] <= '9' {
+            w *= 10;
+            w += line[i] - '0';
+            i += 1;
+        }
+
+        i += 1;
+        let h = 0;
+        while i < line:len() {
+            h *= 10;
+            h += line[i] - '0';
+            i += 1;
+        }
+
+        for x in x..x+w {
+            for y in y..y+h {
+                grid[x][y] += 1;
+                if claims[x][y] != 0 {
+                    overlapped[claims[x][y]] = true;
+                    overlapped[id] = true;
+                }
+                claims[x][y] = id;
+            }
+        }
+    }
+    let count = 0;
+    for _,row in grid {
+        for _, val in row {
+            if val >= 2 {count += 1}
+        }
+    }
+    print count;
+    for i in 1..overlapped:len() {
+        if !overlapped[i] {
+            print i;
+        }
+    }
+}

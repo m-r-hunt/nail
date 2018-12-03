@@ -646,6 +646,12 @@ impl VM {
                     self.push(Value::Boolean(value.is_falsey()));
                 }
 
+                Some(chunk::OpCode::And) => {
+                    let a = self.pop();
+                    let b = self.pop();
+                    self.push(Value::Boolean(!a.is_falsey() && !b.is_falsey()));
+                }
+
                 None => {
                     return Err(InterpreterError::RuntimeError(
                         "Bad instruction".to_string(),

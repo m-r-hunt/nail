@@ -59,6 +59,8 @@ pub enum OpCode {
     PushMap = 35,
 
     Not = 36,
+
+    And = 37,
 }
 
 impl OpCode {
@@ -120,6 +122,7 @@ impl OpCode {
             35 => Some(OpCode::PushMap),
 
             36 => Some(OpCode::Not),
+            37 => Some(OpCode::And),
 
             _ => None,
         }

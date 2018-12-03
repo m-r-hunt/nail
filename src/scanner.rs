@@ -47,13 +47,13 @@ pub enum TokenType {
     Less,
     LessEqual,
     HashLeftBrace,
+    AmpersandAmpersand,
 
     Identifier,
     String,
     Number,
     CharLiteral,
 
-    And,
     Break,
     Continue,
     Else,
@@ -87,7 +87,6 @@ pub struct Token {
 impl Scanner {
     pub fn new(source: &str) -> Scanner {
         let mut kw_map = std::collections::HashMap::new();
-        kw_map.insert("and".to_string(), TokenType::And);
         kw_map.insert("break".to_string(), TokenType::Break);
         kw_map.insert("continue".to_string(), TokenType::Continue);
         kw_map.insert("else".to_string(), TokenType::Else);
@@ -212,6 +211,15 @@ impl Scanner {
             '#' => {
                 if self.token_match('{') {
                     Ok(self.make_token(TokenType::HashLeftBrace))
+                } else {
+                    Err(ScannerError(
+                        "Unexpected character: # without {.".to_string(),
+                    ))
+                }
+            }
+            '&' => {
+                if self.token_match('&') {
+                    Ok(self.make_token(TokenType::AmpersandAmpersand))
                 } else {
                     Err(ScannerError(
                         "Unexpected character: # without {.".to_string(),
