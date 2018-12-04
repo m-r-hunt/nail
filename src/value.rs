@@ -88,10 +88,48 @@ impl Value {
     }
 }
 
+pub trait ExternalType {
+    fn get_arity(&self, name: &str) -> usize;
+    fn call(&mut self, name: &str, args: Vec<Value>) -> ReferenceType;
+}
+
+use regex::Regex;
+impl ExternalType for Regex {
+    fn get_arity(&self, name: &str) -> usize {
+        if name == "match" {
+            1
+        } else {
+            panic!("Bad call to regex.")
+        }
+    }
+
+    fn call(&mut self, name: &str, args: Vec<Value>) -> ReferenceType {
+        if name == "match" {
+            if let Value::String(ref s) = args[0] {
+                match self.captures(&s) {
+                    Some(c) => {
+                        return ReferenceType::Array(
+                            c.iter()
+                                .map(|e| Value::String(e.unwrap().as_str().to_string()))
+                                .collect(),
+                        )
+                    }
+                    None => return ReferenceType::Nil,
+                }
+            } else {
+                panic!("Bad call to regex match");
+            }
+        } else {
+            panic!("Bad call to regex.")
+        }
+    }
+}
+
 pub enum ReferenceType {
     Nil,
     Array(Vec<Value>),
     Map(HashMap<HashableValue, Value>),
+    External(Box<ExternalType>),
 }
 
 impl std::fmt::Display for Value {
@@ -120,4 +158,9 @@ impl Value {
     pub fn is_truey(&self) -> bool {
         !self.is_falsey()
     }
+}
+
+pub enum ValueOrRef {
+    Value(Value),
+    Ref(ReferenceType),
 }

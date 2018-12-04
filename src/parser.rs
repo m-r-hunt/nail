@@ -856,7 +856,8 @@ impl Parser {
             let s = s
                 .replace("\\n", "\n")
                 .replace("\\t", "\t")
-                .replace("\\r", "\r");
+                .replace("\\r", "\r")
+                .replace("\\\\", "\\");
             return Ok(Expression::Literal(Literal::String(s.to_string(), t.line)));
         }
         if self.matches(&[TokenType::CharLiteral])? {
@@ -869,6 +870,7 @@ impl Parser {
                     'n' => c = '\n',
                     'r' => c = '\r',
                     't' => c = '\t',
+                    '\\' => c = '\\',
                     _ => {
                         return Err(ParserError(
                             "Unknown char literal escape".to_string(),

@@ -438,7 +438,8 @@ impl VM {
                                 match ref_type {
                                     ReferenceType::Array(ref mut a) => {
                                         if builtin == "len" {
-                                            to_push = Value::Number(a.len() as f64);
+                                            to_push =
+                                                ValueOrRef::Value(Value::Number(a.len() as f64));
                                         } else if builtin == "push" {
                                             let value = {
                                                 // Hack, copied pop
@@ -446,12 +447,27 @@ impl VM {
                                                 self.stack[self.stack_top].clone()
                                             };
                                             a.push(value);
-                                            to_push = Value::Nil;
+                                            to_push = ValueOrRef::Value(Value::Nil);
                                         } else {
                                             return Err(InterpreterError::RuntimeError(
                                                 "Unknown array builtin".to_string(),
                                                 current_line,
                                             ));
+                                        }
+                                    }
+                                    ReferenceType::External(ref mut e) => {
+                                        let arity = e.get_arity(&builtin);
+                                        let mut args = Vec::new();
+                                        for _ in 0..arity {
+                                            // Hack: copied pop
+                                            self.stack_top -= 1;
+                                            args.push(self.stack[self.stack_top].clone())
+                                        }
+                                        let rt = e.call(&builtin, args);
+                                        if let ReferenceType::Nil = rt {
+                                            to_push = ValueOrRef::Value(Value::Nil);
+                                        } else {
+                                            to_push = ValueOrRef::Ref(rt);
                                         }
                                     }
                                     _ => {
@@ -462,7 +478,13 @@ impl VM {
                                     }
                                 }
                             }
-                            self.push(to_push);
+                            match to_push {
+                                ValueOrRef::Value(v) => self.push(v),
+                                ValueOrRef::Ref(r) => {
+                                    let id = self.new_reference_type(r);
+                                    self.push(Value::ReferenceId(id));
+                                }
+                            }
                         }
 
                         Value::String(s) => {
@@ -487,6 +509,11 @@ impl VM {
                                 }
                             } else if builtin == "parseNumber" {
                                 self.push(Value::Number(s.parse().unwrap()));
+                            } else if builtin == "regex" {
+                                let id = self.new_reference_type(ReferenceType::External(
+                                    Box::new(regex::Regex::new(&s).unwrap()),
+                                ));
+                                self.push(Value::ReferenceId(id));
                             } else {
                                 return Err(InterpreterError::RuntimeError(
                                     "Unknown string builtin".to_string(),

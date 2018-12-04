@@ -6,6 +6,7 @@ autobins = false
 
 [dependencies]
 num = "0.2"
+regex = "1"
 
 [lib]
 name = "notlox"

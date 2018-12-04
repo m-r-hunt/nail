@@ -1,4 +1,5 @@
 extern crate num;
+extern crate regex;
 
 pub mod chunk;
 mod compiler;
