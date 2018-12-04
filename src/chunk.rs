@@ -60,7 +60,10 @@ pub enum OpCode {
 
     Not = 36,
 
-    And = 37,
+    And = 37, // Remove?
+
+    Dup = 38,
+    JumpIfTrue = 39,
 }
 
 impl OpCode {
@@ -122,7 +125,12 @@ impl OpCode {
             35 => Some(OpCode::PushMap),
 
             36 => Some(OpCode::Not),
+
             37 => Some(OpCode::And),
+
+            38 => Some(OpCode::Dup),
+
+            39 => Some(OpCode::JumpIfTrue),
 
             _ => None,
         }

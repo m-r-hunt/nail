@@ -254,32 +254,73 @@ impl Compiler {
     }
 
     fn compile_binary(&mut self, binary: parser::Binary) {
-        self.compile_expression(*binary.left);
-        self.compile_expression(*binary.right);
-        match binary.operator.token_type {
-            TokenType::Plus => self.chunk.write_chunk(OpCode::Add as u8, binary.line),
-            TokenType::Minus => self.chunk.write_chunk(OpCode::Subtract as u8, binary.line),
-            TokenType::Star => self.chunk.write_chunk(OpCode::Multiply as u8, binary.line),
-            TokenType::Slash => self.chunk.write_chunk(OpCode::Divide as u8, binary.line),
-            TokenType::Percent => self.chunk.write_chunk(OpCode::Remainder as u8, binary.line),
-            TokenType::Less => self.chunk.write_chunk(OpCode::TestLess as u8, binary.line),
-            TokenType::LessEqual => self
-                .chunk
-                .write_chunk(OpCode::TestLessOrEqual as u8, binary.line),
-            TokenType::Greater => self
-                .chunk
-                .write_chunk(OpCode::TestGreater as u8, binary.line),
-            TokenType::GreaterEqual => self
-                .chunk
-                .write_chunk(OpCode::TestGreaterOrEqual as u8, binary.line),
-            TokenType::EqualEqual => self.chunk.write_chunk(OpCode::TestEqual as u8, binary.line),
-            TokenType::BangEqual => self
-                .chunk
-                .write_chunk(OpCode::TestNotEqual as u8, binary.line),
-            TokenType::AmpersandAmpersand => self.chunk.write_chunk(OpCode::And as u8, binary.line),
-            _ => panic!("Unimplemented binary operator"),
+        if binary.operator.token_type == TokenType::AmpersandAmpersand {
+            self.compile_and(binary);
+        } else if binary.operator.token_type == TokenType::PipePipe {
+            self.compile_or(binary);
+        } else {
+            self.compile_expression(*binary.left);
+            self.compile_expression(*binary.right);
+            match binary.operator.token_type {
+                TokenType::Plus => self.chunk.write_chunk(OpCode::Add as u8, binary.line),
+                TokenType::Minus => self.chunk.write_chunk(OpCode::Subtract as u8, binary.line),
+                TokenType::Star => self.chunk.write_chunk(OpCode::Multiply as u8, binary.line),
+                TokenType::Slash => self.chunk.write_chunk(OpCode::Divide as u8, binary.line),
+                TokenType::Percent => self.chunk.write_chunk(OpCode::Remainder as u8, binary.line),
+                TokenType::Less => self.chunk.write_chunk(OpCode::TestLess as u8, binary.line),
+                TokenType::LessEqual => self
+                    .chunk
+                    .write_chunk(OpCode::TestLessOrEqual as u8, binary.line),
+                TokenType::Greater => self
+                    .chunk
+                    .write_chunk(OpCode::TestGreater as u8, binary.line),
+                TokenType::GreaterEqual => self
+                    .chunk
+                    .write_chunk(OpCode::TestGreaterOrEqual as u8, binary.line),
+                TokenType::EqualEqual => {
+                    self.chunk.write_chunk(OpCode::TestEqual as u8, binary.line)
+                }
+                TokenType::BangEqual => self
+                    .chunk
+                    .write_chunk(OpCode::TestNotEqual as u8, binary.line),
+                _ => panic!("Unimplemented binary operator"),
+            }
+            self.adjust_stack_usage(-1);
         }
+    }
+
+    fn compile_and(&mut self, binary: parser::Binary) {
+        self.compile_expression(*binary.left);
+        self.chunk.write_chunk(OpCode::Dup as u8, binary.line);
+        self.adjust_stack_usage(1);
+        self.chunk
+            .write_chunk(OpCode::JumpIfFalse as u8, binary.line);
+        let jump_address = self.chunk.code.len();
+        self.chunk.write_chunk(0, binary.line);
+        self.chunk.write_chunk(0, binary.line);
         self.adjust_stack_usage(-1);
+        self.chunk.write_chunk(OpCode::Pop as u8, binary.line);
+        self.adjust_stack_usage(-1);
+        self.compile_expression(*binary.right);
+        let jump_target = self.chunk.code.len();
+        self.insert_jump_address(jump_address, jump_target);
+    }
+
+    fn compile_or(&mut self, binary: parser::Binary) {
+        self.compile_expression(*binary.left);
+        self.chunk.write_chunk(OpCode::Dup as u8, binary.line);
+        self.adjust_stack_usage(1);
+        self.chunk
+            .write_chunk(OpCode::JumpIfTrue as u8, binary.line);
+        let jump_address = self.chunk.code.len();
+        self.chunk.write_chunk(0, binary.line);
+        self.chunk.write_chunk(0, binary.line);
+        self.adjust_stack_usage(-1);
+        self.chunk.write_chunk(OpCode::Pop as u8, binary.line);
+        self.adjust_stack_usage(-1);
+        self.compile_expression(*binary.right);
+        let jump_target = self.chunk.code.len();
+        self.insert_jump_address(jump_address, jump_target);
     }
 
     fn compile_grouping(&mut self, grouping: parser::Grouping) {

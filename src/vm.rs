@@ -652,6 +652,19 @@ impl VM {
                     self.push(Value::Boolean(!a.is_falsey() && !b.is_falsey()));
                 }
 
+                Some(chunk::OpCode::Dup) => {
+                    let val = self.peek();
+                    self.push(val);
+                }
+
+                Some(chunk::OpCode::JumpIfTrue) => {
+                    let target = self.read_signed_16();
+                    let value = self.pop();
+                    if value.is_truey() {
+                        self.ip = (self.ip as isize + target as isize) as usize;
+                    }
+                }
+
                 None => {
                     return Err(InterpreterError::RuntimeError(
                         "Bad instruction".to_string(),

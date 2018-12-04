@@ -79,6 +79,12 @@ pub fn disassemble_instruction(chunk: &Chunk, offset: usize) -> usize {
         Some(OpCode::Not) => simple_instruction("OP_NOT", offset),
         Some(OpCode::And) => simple_instruction("OP_AND", offset),
 
+        Some(OpCode::Dup) => simple_instruction("OP_DUP", offset),
+
+        Some(OpCode::JumpIfTrue) => {
+            signed_number_16_instruction("OP_JUMP_IF_TRUE", &chunk, offset)
+        }
+
         None => {
             println!("Unknown opcode {}", instr);
             offset + 1

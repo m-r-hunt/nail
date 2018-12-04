@@ -117,4 +117,7 @@ impl Value {
             _ => false,
         }
     }
+    pub fn is_truey(&self) -> bool {
+        !self.is_falsey()
+    }
 }

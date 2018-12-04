@@ -455,7 +455,7 @@ impl Parser {
 
     fn and(&mut self) -> Result<Expression> {
         let mut expr = self.equality()?;
-        while self.matches(&[TokenType::AmpersandAmpersand])? {
+        while self.matches(&[TokenType::AmpersandAmpersand, TokenType::PipePipe])? {
             let operator = self.previous();
             let right = self.equality()?;
             expr = Expression::Binary(Binary {

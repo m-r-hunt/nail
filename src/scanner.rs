@@ -48,6 +48,7 @@ pub enum TokenType {
     LessEqual,
     HashLeftBrace,
     AmpersandAmpersand,
+    PipePipe,
 
     Identifier,
     String,
@@ -63,7 +64,6 @@ pub enum TokenType {
     If,
     In,
     Nil,
-    Or,
     Print,
     Return,
     True,
@@ -96,7 +96,6 @@ impl Scanner {
         kw_map.insert("if".to_string(), TokenType::If);
         kw_map.insert("in".to_string(), TokenType::In);
         kw_map.insert("nil".to_string(), TokenType::Nil);
-        kw_map.insert("or".to_string(), TokenType::Or);
         kw_map.insert("print".to_string(), TokenType::Print);
         kw_map.insert("return".to_string(), TokenType::Return);
         kw_map.insert("true".to_string(), TokenType::True);
@@ -222,7 +221,16 @@ impl Scanner {
                     Ok(self.make_token(TokenType::AmpersandAmpersand))
                 } else {
                     Err(ScannerError(
-                        "Unexpected character: # without {.".to_string(),
+                        "Unexpected character: & without &.".to_string(),
+                    ))
+                }
+            }
+            '|' => {
+                if self.token_match('|') {
+                    Ok(self.make_token(TokenType::PipePipe))
+                } else {
+                    Err(ScannerError(
+                        "Unexpected character: | without |.".to_string(),
                     ))
                 }
             }
