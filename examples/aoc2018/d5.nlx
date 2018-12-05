@@ -3,30 +3,36 @@ fn main() {
         let out = [];
         let out_i = -1;
         let in_i = 0;
-        while in_i < polymer:len() {
+	let len = polymer:len();
+        out:resize(len);
+        while in_i < len {
             out_i += 1;
             out[out_i] = polymer[in_i];
             in_i += 1;
-            while out_i >= 0 && in_i < polymer:len() && ((out[out_i] == polymer[in_i] + ('A' - 'a')) || (out[out_i] == polymer[in_i] - ('A' - 'a'))) {
+            while out_i >= 0 && in_i < len && ((out[out_i] == polymer[in_i] + ('A' - 'a')) || (out[out_i] == polymer[in_i] - ('A' - 'a'))) {
                 out_i -= 1;
                 in_i += 1;
             }
         }
-        return out_i+1;
+        out:resize(out_i+1);
+        return out;
     }
 
     let polymer = "d5input.txt":readFile();
-    print react(polymer);
+    let reacted = react(polymer);
+    print reacted:len();
 
     let min = 99999;
     for c in 'a'..'z' {
+        let c2 = c + ('A' - 'a');
         let filtered_polymer = [];
-        for i in 0..polymer:len() {
-            if polymer[i] != c && polymer[i] != c + ('A' - 'a') {
-                filtered_polymer:push(polymer[i]);
+        for i in 0..reacted:len() {
+            let p = reacted[i];
+            if p != c && p != c2 {
+                filtered_polymer:push(p);
             }
         }
-        let result = react(filtered_polymer);
+        let result = react(filtered_polymer):len();
         if result < min {
             min = result;
         }

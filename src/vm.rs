@@ -467,6 +467,19 @@ impl VM {
                                                     .cmp(&HashableValue::try_from(b, current_line).unwrap())
                                             });
                                             to_push = ValueOrRef::Value(Value::ReferenceId(id));
+                                        } else if builtin == "resize" {
+                                            let v = {
+                                                // Hack, copied pop
+                                                self.stack_top -= 1;
+                                                self.stack[self.stack_top].clone()
+                                            };
+                                            let v = if let Value::Number(n) = v {
+                                                n
+                                            } else {
+                                                panic!("Bad arg to array resize.");
+                                            };
+                                            a.resize(v as usize, Value::Nil);
+                                            to_push = ValueOrRef::Value(Value::Nil);
                                         } else {
                                             return Err(InterpreterError::RuntimeError(
                                                 "Unknown array builtin".to_string(),
