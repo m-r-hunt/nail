@@ -153,29 +153,41 @@ impl VM {
                 }
 
                 Some(chunk::OpCode::Add) => {
-                    let top = self.peek();
+                    let top = self.peek2();
                     if let Value::Number(_) = top {
                         binary_op!(self, +, Number, Number, current_line)
                     } else if let Value::String(_) = top {
-                        let mut b;
-                        if let Value::String(bval) = self.pop() {
-                            b = bval;
+                        let v = self.pop();
+                        if let Value::String(b) = v {
+                            let mut a;
+                            if let Value::String(aval) = self.pop() {
+                                a = aval;
+                            } else {
+                                return Err(InterpreterError::RuntimeError(
+                                    "Bad argument to binary operator, not a number.".to_string(),
+                                    current_line,
+                                ));
+                            }
+                            self.push(Value::String(a + &b))
+                        } else if let Value::Number(n) = v {
+                            let mut a;
+                            if let Value::String(aval) = self.pop() {
+                                a = aval;
+                            } else {
+                                return Err(InterpreterError::RuntimeError(
+                                    "Bad argument to binary operator, not a number.".to_string(),
+                                    current_line,
+                                ));
+                            }
+                            let mut s = a.clone();
+                            s.push(n as u8 as char);
+                            self.push(Value::String(s));
                         } else {
                             return Err(InterpreterError::RuntimeError(
                                 "Bad argument to binary operator, not a string.".to_string(),
                                 current_line,
                             ));
                         }
-                        let mut a;
-                        if let Value::String(aval) = self.pop() {
-                            a = aval;
-                        } else {
-                            return Err(InterpreterError::RuntimeError(
-                                "Bad argument to binary operator, not a number.".to_string(),
-                                current_line,
-                            ));
-                        }
-                        self.push(Value::String(a + &b))
                     } else {
                         return Err(InterpreterError::RuntimeError(
                             "Bad or mismatched arguments to +".to_string(),
@@ -734,6 +746,10 @@ impl VM {
 
     pub fn peek(&mut self) -> Value {
         self.stack[self.stack_top - 1].clone()
+    }
+
+    pub fn peek2(&mut self) -> Value {
+        self.stack[self.stack_top - 2].clone()
     }
 
     pub fn new_reference_type(&mut self, value: ReferenceType) -> usize {
