@@ -51,15 +51,15 @@ impl std::error::Error for InterpreterError {}
 macro_rules! binary_op {
     ( $self:expr, $op:tt, $type: ident, $ret:ident, $line:expr ) => {
         {
-            let mut b;
-            if let Value::$type(bval) = $self.pop() {
-                b = bval;
-            } else {
-                return Err(InterpreterError::RuntimeError("Bad argument to binary operator, not a number.".to_string(), $line));
-            }
             let mut a;
             if let Value::$type(aval) = $self.pop() {
                 a = aval;
+            } else {
+                return Err(InterpreterError::RuntimeError("Bad argument to binary operator, not a number.".to_string(), $line));
+            }
+            let mut b;
+            if let Value::$type(bval) = $self.pop() {
+                b = bval;
             } else {
                 return Err(InterpreterError::RuntimeError("Bad argument to binary operator, not a number.".to_string(), $line));
             }
@@ -153,14 +153,15 @@ impl VM {
                 }
 
                 Some(chunk::OpCode::Add) => {
-                    let top = self.peek2();
+                    let top = self.peek();
                     if let Value::Number(_) = top {
                         binary_op!(self, +, Number, Number, current_line)
                     } else if let Value::String(_) = top {
-                        let v = self.pop();
-                        if let Value::String(b) = v {
+                        let aa = self.pop();
+                        let b = self.pop();
+                        if let Value::String(b) = b {
                             let mut a;
-                            if let Value::String(aval) = self.pop() {
+                            if let Value::String(aval) = aa {
                                 a = aval;
                             } else {
                                 return Err(InterpreterError::RuntimeError(
@@ -169,9 +170,9 @@ impl VM {
                                 ));
                             }
                             self.push(Value::String(a + &b))
-                        } else if let Value::Number(n) = v {
+                        } else if let Value::Number(n) = b {
                             let mut a;
-                            if let Value::String(aval) = self.pop() {
+                            if let Value::String(aval) = aa {
                                 a = aval;
                             } else {
                                 return Err(InterpreterError::RuntimeError(
@@ -746,10 +747,6 @@ impl VM {
 
     pub fn peek(&mut self) -> Value {
         self.stack[self.stack_top - 1].clone()
-    }
-
-    pub fn peek2(&mut self) -> Value {
-        self.stack[self.stack_top - 2].clone()
     }
 
     pub fn new_reference_type(&mut self, value: ReferenceType) -> usize {

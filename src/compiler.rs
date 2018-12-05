@@ -259,8 +259,8 @@ impl Compiler {
         } else if binary.operator.token_type == TokenType::PipePipe {
             self.compile_or(binary);
         } else {
-            self.compile_expression(*binary.left);
             self.compile_expression(*binary.right);
+            self.compile_expression(*binary.left);
             match binary.operator.token_type {
                 TokenType::Plus => self.chunk.write_chunk(OpCode::Add as u8, binary.line),
                 TokenType::Minus => self.chunk.write_chunk(OpCode::Subtract as u8, binary.line),
