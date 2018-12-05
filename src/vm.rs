@@ -322,7 +322,7 @@ impl VM {
                                     }
                                     ReferenceType::Map(m) => {
                                         let hashable_value =
-                                            HashableValue::try_from(the_value, current_line)
+                                            HashableValue::try_from(&the_value, current_line)
                                                 .unwrap();
                                         to_push =
                                             m.get(&hashable_value).unwrap_or(&Value::Nil).clone();
@@ -407,7 +407,7 @@ impl VM {
                                 }
                                 ReferenceType::Map(ref mut m) => {
                                     m.insert(
-                                        HashableValue::try_from(index_value, current_line)?,
+                                        HashableValue::try_from(&index_value, current_line)?,
                                         new_value,
                                     );
                                 }
@@ -461,6 +461,12 @@ impl VM {
                                             };
                                             a.push(value);
                                             to_push = ValueOrRef::Value(Value::Nil);
+                                        } else if builtin == "sort" {
+                                            a.sort_by(|a, b| {
+                                                HashableValue::try_from(a, current_line).unwrap()
+                                                    .cmp(&HashableValue::try_from(b, current_line).unwrap())
+                                            });
+                                            to_push = ValueOrRef::Value(Value::ReferenceId(id));
                                         } else {
                                             return Err(InterpreterError::RuntimeError(
                                                 "Unknown array builtin".to_string(),
@@ -664,7 +670,7 @@ impl VM {
                         {
                             let map = &mut self.heap[id];
                             if let ReferenceType::Map(ref mut m) = map {
-                                m.insert(HashableValue::try_from(key, current_line)?, value);
+                                m.insert(HashableValue::try_from(&key, current_line)?, value);
                             } else {
                                 return Err(InterpreterError::RuntimeError(
                                     "Map push on non-map".to_string(),
