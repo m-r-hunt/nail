@@ -1,0 +1,72 @@
+fn main() {
+    let minX = 99999;
+    let minY = 99999;
+    let maxX = 0;
+    let maxY = 0;
+    let coords = [];
+    let input = "d6input.txt":readFile():split("\n");
+    let re = "([0-9]*), ([0-9]*)":regex();
+    for _, line in input {
+        if line:len() == 0 {continue;}
+        let match = re:match(line);
+        let c = [match[1]:parseNumber(), match[2]:parseNumber()];
+        if c[0] < minX {minX = c[0];}
+        if c[0] > maxX {maxX = c[0];}
+        if c[1] < minY {minY = c[1];}
+        if c[1] > maxY {maxY = c[1];}
+        coords:push(c);
+    }
+    print minX;
+    print minY;
+    print maxX;
+    print maxY;
+    let grid = #{};
+    for i, c in coords {
+        print i;
+        let queue = [[c[0], c[1], 0]];
+        let visited = #{[c[0] + 100000*c[1]]: true};
+        let qi=0;
+        while qi < queue:len() {
+            let cc = queue[qi];
+            qi += 1;
+            let old = grid[cc[0] + 100000*cc[1]];
+            if old && cc[2] < old[0] {
+                grid[cc[0] + 100000*cc[1]] = [cc[2], i];
+            } else if old && cc[2] == old[0] {
+                grid[cc[0] + 100000*cc[1]] = [cc[2], "TIE"];
+            }
+            if cc[0]+1 <= maxX && !visited[cc[0]+1 + 100000*cc[1]] {
+                visited[cc[0]+1 + 100000*cc[1]] = true;
+                queue:push([cc[0]+1, cc[1], cc[2]+1]);
+            }
+            if cc[0]-1 >= minX && !visited[cc[0]-1 + 100000*cc[1]] {
+                visited[cc[0]-1 + 100000*cc[1]] = true;
+                queue:push([cc[0]-1, cc[1], cc[2]+1]);
+            }
+            if cc[1]+1 <= maxY && !visited[cc[0] + 100000*(cc[1]+1)] {
+                visited[cc[0] + 100000*(cc[1]+1)] = true;
+                queue:push([cc[0], cc[1]+1, cc[2]+1]);
+            }
+            if cc[1]-1 >= minY && !visited[cc[0] + 100000*(cc[1]-1)] {
+                visited[cc[0] + 100000*(cc[1]-1)] = true;
+                queue:push([cc[0], cc[1]-1, cc[2]+1]);
+            }
+        }
+    }
+
+    let areas = #{};
+    let inf = #{};
+    for c, v in grid {
+        let x = c % 100000;
+        let y = (c / 100000):floor();
+        if x == minX || y == minY || x == maxX || y == maxY {
+            inf[v[1]] = true;
+        }
+        areas[v[1]] += 1;
+    }
+    for k, v in areas {
+        print k;
+        print v;
+        print "===";
+    }
+}
