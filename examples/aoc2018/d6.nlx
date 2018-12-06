@@ -20,6 +20,7 @@ fn main() {
     print minY;
     print maxX;
     print maxY;
+    print (maxX - minX) * (maxY - minY);
     let grid = #{};
     for i, c in coords {
         print i;
@@ -30,9 +31,9 @@ fn main() {
             let cc = queue[qi];
             qi += 1;
             let old = grid[cc[0] + 100000*cc[1]];
-            if old && cc[2] < old[0] {
+            if !old || cc[2] < old[0] {
                 grid[cc[0] + 100000*cc[1]] = [cc[2], i];
-            } else if old && cc[2] == old[0] {
+            } else if !old || cc[2] == old[0] {
                 grid[cc[0] + 100000*cc[1]] = [cc[2], "TIE"];
             }
             if cc[0]+1 <= maxX && !visited[cc[0]+1 + 100000*cc[1]] {
@@ -56,17 +57,22 @@ fn main() {
 
     let areas = #{};
     let inf = #{};
+    let tot = 0;
     for c, v in grid {
+        tot += 1;
+        print tot;
         let x = c % 100000;
         let y = (c / 100000):floor();
         if x == minX || y == minY || x == maxX || y == maxY {
             inf[v[1]] = true;
         }
+        if !areas[v[1]] {areas[v[1]] = 0;}
         areas[v[1]] += 1;
     }
     for k, v in areas {
+        print "===";
+        print inf[k];
         print k;
         print v;
-        print "===";
     }
 }

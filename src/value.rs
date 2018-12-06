@@ -90,16 +90,16 @@ impl Ord for HashableValue {
                 HashableValue::String(s2) => s.cmp(s2),
                 HashableValue::ReferenceId(_) | HashableValue::Range(..) => Ordering::Less,
                 _ => Ordering::Greater,
-            }
+            },
             HashableValue::ReferenceId(id) => match other {
                 HashableValue::ReferenceId(id2) => id.cmp(id2),
                 HashableValue::Range(..) => Ordering::Less,
                 _ => Ordering::Greater,
-            }
+            },
             HashableValue::Range(l, _) => match other {
                 HashableValue::Range(l2, _) => l.to_f64().partial_cmp(&l2.to_f64()).unwrap(),
                 _ => Ordering::Greater,
-            }
+            },
         }
     }
 }

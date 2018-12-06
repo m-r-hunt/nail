@@ -117,9 +117,9 @@ impl VM {
                 }
                 println!();
                 debug::disassemble_instruction(&self.chunk, self.ip);
-                let mut buf = [0; 10];
-                use std::io::Read;
-                std::io::stdin().read(&mut buf).unwrap();
+                //let mut buf = [0; 10];
+                //use std::io::Read;
+                //std::io::stdin().read(&mut buf).unwrap();
             }
             let current_line = self.chunk.lines[self.ip];
             let instruction = self.read_byte();
@@ -463,8 +463,12 @@ impl VM {
                                             to_push = ValueOrRef::Value(Value::Nil);
                                         } else if builtin == "sort" {
                                             a.sort_by(|a, b| {
-                                                HashableValue::try_from(a, current_line).unwrap()
-                                                    .cmp(&HashableValue::try_from(b, current_line).unwrap())
+                                                HashableValue::try_from(a, current_line)
+                                                    .unwrap()
+                                                    .cmp(
+                                                        &HashableValue::try_from(b, current_line)
+                                                            .unwrap(),
+                                                    )
                                             });
                                             to_push = ValueOrRef::Value(Value::ReferenceId(id));
                                         } else if builtin == "resize" {
@@ -551,6 +555,12 @@ impl VM {
                                     "Unknown string builtin".to_string(),
                                     current_line,
                                 ));
+                            }
+                        }
+
+                        Value::Number(n) => {
+                            if builtin == "floor" {
+                                self.push(Value::Number(n.floor()));
                             }
                         }
 
