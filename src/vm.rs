@@ -463,6 +463,20 @@ impl VM {
                                             to_push = ValueOrRef::Value(Value::Nil);
                                         } else if builtin == "pop" {
                                             to_push = ValueOrRef::Value(a.pop().unwrap());
+                                        } else if builtin == "remove" {
+                                            let to_remove = {
+                                                // Hack, copied pop
+                                                self.stack_top -= 1;
+                                                self.stack[self.stack_top].clone()
+                                            };
+                                            if let Value::Number(n) = to_remove {
+                                                to_push = ValueOrRef::Value(a.remove(n as usize));
+                                            } else {
+                                                return Err(InterpreterError::RuntimeError(
+                                                    "Attempt to remove non-integer index from array".to_string(),
+                                                    current_line,
+                                                ));
+                                            }
                                         } else if builtin == "sort" {
                                             a.sort_by(|a, b| {
                                                 HashableValue::try_from(a, current_line)
