@@ -461,6 +461,8 @@ impl VM {
                                             };
                                             a.push(value);
                                             to_push = ValueOrRef::Value(Value::Nil);
+                                        } else if builtin == "pop" {
+                                            to_push = ValueOrRef::Value(a.pop().unwrap());
                                         } else if builtin == "sort" {
                                             a.sort_by(|a, b| {
                                                 HashableValue::try_from(a, current_line)
