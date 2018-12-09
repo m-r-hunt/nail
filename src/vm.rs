@@ -477,6 +477,26 @@ impl VM {
                                                     current_line,
                                                 ));
                                             }
+                                        } else if builtin == "insert" {
+                                            let to_insert_val = {
+                                                // Hack, copied pop
+                                                self.stack_top -= 1;
+                                                self.stack[self.stack_top].clone()
+                                            };
+                                            let to_insert = {
+                                                // Hack, copied pop
+                                                self.stack_top -= 1;
+                                                self.stack[self.stack_top].clone()
+                                            };
+                                            if let Value::Number(n) = to_insert {
+                                                a.insert(n as usize, to_insert_val);
+                                                to_push = ValueOrRef::Value(Value::Nil);
+                                            } else {
+                                                return Err(InterpreterError::RuntimeError(
+                                                    "Attempt to insert non-integer index from array".to_string(),
+                                                    current_line,
+                                                ));
+                                            }
                                         } else if builtin == "sort" {
                                             a.sort_by(|a, b| {
                                                 HashableValue::try_from(a, current_line)
