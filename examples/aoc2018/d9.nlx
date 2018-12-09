@@ -1,0 +1,26 @@
+fn main() {
+    let players = 452;
+    let marbles = 7078400;
+    let circle = [0];
+    let n = 0;
+    let m = 1;
+    let p = 0;
+    let player_scores = [];
+    for i in 0..players {player_scores:push(0);}
+    while m <= marbles {
+        if m % 23 == 0 {
+            player_scores[p] += m;
+            n -= 7;
+            if n < 0 {n += circle:len();}
+            player_scores[p] += circle:remove(n);
+        } else {
+            n = (n + 2) % circle:len();
+            circle:insert(n, m);
+        }
+        p = (p + 1) % players;
+        m += 1;
+    }
+    let max_score = 0;
+    for _, s in player_scores { if s > max_score {max_score = s;} }
+    print max_score;
+}
