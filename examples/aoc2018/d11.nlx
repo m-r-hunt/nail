@@ -9,25 +9,24 @@ fn main() {
         power -= 5;
         return power;
     }
-    let powers = [];
-    for x in 0..301 {
-        powers[x] = [];
-        for y in 0..301 {
-            powers[x][y] = power(x, y);
+    let partial_sums = [[]];
+    for y in 0..301 {partial_sums[0][y] = 0;}
+    for x in 1..301 {
+        partial_sums[x] = [0];
+        for y in 1..301 {
+            partial_sums[x][y] = power(x, y) +
+                partial_sums[x-1][y] +
+                partial_sums[x][y-1] -
+                partial_sums[x-1][y-1];
         }
     }
 
     let max_power = 0;
     let max_x = 0;
     let max_y = 0;
-    for x in 0..299 {
-        for y in 0..299 {
-            let total = 0;
-            for x2 in x..x+3 {
-                for y2 in y..y+3 {
-                    total += powers[x2][y2];
-                }
-            }
+    for x in 1..299 {
+        for y in 1..299 {
+            let total = partial_sums[x+2][y+2] - partial_sums[x-1][y+2] - partial_sums[x+2][y-1] + partial_sums[x-1][y-1];
             if total > max_power {
                 max_power = total;
                 max_x = x;
@@ -41,26 +40,25 @@ fn main() {
     print "====";
     
     let max_power = 0;
+    let max_x = 0;
+    let max_y = 0;
+    let max_size = 0;
     for size in 1..300 {
-        for x in 0..(302-size) {
-            for y in 0..(302-size) {
-                let total = 0;
-                for x2 in x..x+size {
-                    for y2 in y..y+size {
-                        total += powers[x2][y2];
-                    }
-                }
+        for x in 1..(302-size) {
+            for y in 1..(302-size) {
+                let total = partial_sums[x+size-1][y+size-1] - partial_sums[x-1][y+size-1] - partial_sums[x+size-1][y-1] + partial_sums[x-1][y-1];
                 if total > max_power {
                     max_power = total;
-                    print "=";
-                    print total;
-                    print x;
-                    print y;
-                    print size;
-                    print "=";
+                    max_x = x;
+                    max_y = y;
+                    max_size = size;
                 }
             }
         }
-        print max_power;
     }
+    print "Part 2:";
+    print max_x;
+    print max_y;
+    print max_size;
+    print "====";
 }
