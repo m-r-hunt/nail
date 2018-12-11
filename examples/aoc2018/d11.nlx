@@ -1,0 +1,66 @@
+fn main() {
+    fn power(x, y) {
+        let serial = 6548;
+        let rack_id = x + 10;
+        let power = rack_id * y;
+        power += serial;
+        power *= rack_id;
+        power = ((power / 100):floor()) % 10;
+        power -= 5;
+        return power;
+    }
+    let powers = [];
+    for x in 0..301 {
+        powers[x] = [];
+        for y in 0..301 {
+            powers[x][y] = power(x, y);
+        }
+    }
+
+    let max_power = 0;
+    let max_x = 0;
+    let max_y = 0;
+    for x in 0..299 {
+        for y in 0..299 {
+            let total = 0;
+            for x2 in x..x+3 {
+                for y2 in y..y+3 {
+                    total += powers[x2][y2];
+                }
+            }
+            if total > max_power {
+                max_power = total;
+                max_x = x;
+                max_y = y;
+            }
+        }
+    }
+    print "Part 1:";
+    print max_x;
+    print max_y;
+    print "====";
+    
+    let max_power = 0;
+    for size in 1..300 {
+        for x in 0..(302-size) {
+            for y in 0..(302-size) {
+                let total = 0;
+                for x2 in x..x+size {
+                    for y2 in y..y+size {
+                        total += powers[x2][y2];
+                    }
+                }
+                if total > max_power {
+                    max_power = total;
+                    print "=";
+                    print total;
+                    print x;
+                    print y;
+                    print size;
+                    print "=";
+                }
+            }
+        }
+        print max_power;
+    }
+}
