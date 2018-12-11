@@ -34,10 +34,7 @@ fn main() {
             }
         }
     }
-    print "Part 1:";
-    print max_x;
-    print max_y;
-    print "====";
+    print "Part 1: " + max_x:to_string() + "," + max_y:to_string();
     
     let max_power = 0;
     let max_x = 0;
@@ -56,9 +53,5 @@ fn main() {
             }
         }
     }
-    print "Part 2:";
-    print max_x;
-    print max_y;
-    print max_size;
-    print "====";
+    print "Part 2: " + max_x:to_string() + "," + max_y:to_string() + "," + max_size:to_string();
 }

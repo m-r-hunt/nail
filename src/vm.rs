@@ -442,6 +442,11 @@ impl VM {
                         ));
                     };
 
+                    if builtin == "to_string" {
+                        self.push(Value::String(format!("{}", callee)));
+                        continue;
+                    }
+
                     // TODO: Some kind of data driven solution rather than hardcoded ifs.
                     match callee {
                         Value::ReferenceId(id) => {
