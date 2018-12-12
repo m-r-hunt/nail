@@ -5,7 +5,7 @@ fn main() {
         let power = rack_id * y;
         power += serial;
         power *= rack_id;
-        power = ((power / 100):floor()) % 10;
+        power = (power / 100):floor() % 10;
         power -= 5;
         return power;
     }
