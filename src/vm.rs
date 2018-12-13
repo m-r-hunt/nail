@@ -10,11 +10,57 @@ struct CallFrame {
     locals_base: usize,
 }
 
+struct ValueStack {
+    stack: Vec<Value>,
+    top: usize,
+}
+
+impl ValueStack {
+    fn new() -> Self {
+        let mut array = Vec::new();
+        array.resize(STACK_SIZE, Value::Nil);
+        ValueStack {
+            stack: array,
+            top: 0,
+        }
+    }
+
+    fn push(&mut self, value: Value) {
+        self.stack[self.top] = value;
+        self.top += 1
+    }
+
+    fn pop(&mut self, line: usize) -> Result<Value, InterpreterError> {
+        if self.top >= 1 {
+            self.top -= 1;
+            return Ok(self.stack[self.top].clone());
+        } else {
+            return runtime_error("Not enough values on the stack", line);
+        }
+    }
+
+    fn pop_multi(&mut self, n: usize, line: usize) -> Result<Value, InterpreterError> {
+        if self.top >= n {
+            self.top -= n;
+            return Ok(Value::Nil);
+        } else {
+            return runtime_error("Not enough values on the stack", line);
+        }
+    }
+
+    fn peek(&mut self) -> Value {
+        if self.top >= 1 {
+            self.stack[self.top - 1].clone()
+        } else {
+            Value::Nil
+        }
+    }
+}
+
 pub struct VM {
     chunk: chunk::Chunk,
     ip: usize,
-    stack: Vec<Value>,
-    stack_top: usize,
+    stack: ValueStack,
     return_stack: [CallFrame; STACK_SIZE],
     return_stack_top: usize,
     locals: Vec<Value>,
@@ -48,22 +94,26 @@ impl std::fmt::Display for InterpreterError {
 
 impl std::error::Error for InterpreterError {}
 
+fn runtime_error(message: &str, line: usize) -> Result<Value, InterpreterError> {
+    Err(InterpreterError::RuntimeError(message.to_string(), line))
+}
+
 macro_rules! binary_op {
     ( $self:expr, $op:tt, $type: ident, $ret:ident, $line:expr ) => {
         {
             let mut a;
-            if let Value::$type(aval) = $self.pop() {
+            if let Value::$type(aval) = $self.stack.pop($line)? {
                 a = aval;
             } else {
-                return Err(InterpreterError::RuntimeError("Bad argument to binary operator, not a number.".to_string(), $line));
+                return runtime_error("Bad argument to binary operator, not a number.", $line);
             }
             let mut b;
-            if let Value::$type(bval) = $self.pop() {
+            if let Value::$type(bval) = $self.stack.pop($line)? {
                 b = bval;
             } else {
-                return Err(InterpreterError::RuntimeError("Bad argument to binary operator, not a number.".to_string(), $line));
+                return runtime_error("Bad argument to binary operator, not a number.", $line);
             }
-            $self.push(Value::$ret(a $op b))
+            $self.stack.push(Value::$ret(a $op b))
         }
     }
 }
@@ -76,8 +126,7 @@ impl VM {
         VM {
             chunk: chunk::Chunk::new(),
             ip: 0,
-            stack: array.clone(),
-            stack_top: 0,
+            stack: ValueStack::new(),
             return_stack: [CallFrame {
                 return_address: 0,
                 locals_base: 0,
@@ -112,8 +161,8 @@ impl VM {
         loop {
             if cfg!(feature = "debugTraceExecution") {
                 print!("          ");
-                for slot in 0..self.stack_top {
-                    print!("[ {:?} ]", self.stack[slot])
+                for slot in 0..self.stack.top {
+                    print!("[ {:?} ]", self.stack.stack[slot])
                 }
                 println!();
                 debug::disassemble_instruction(&self.chunk, self.ip);
@@ -132,68 +181,53 @@ impl VM {
                         self.locals_base = call_frame.locals_base;
                         self.ip = call_frame.return_address;
                     } else {
-                        return Ok(self.pop());
+                        return Ok(self.stack.pop(current_line)?);
                     }
                 }
 
                 Some(chunk::OpCode::Constant) => {
                     let constant = self.read_constant();
-                    self.push(constant);
+                    self.stack.push(constant);
                 }
 
                 Some(chunk::OpCode::Negate) => {
-                    if let Value::Number(value) = self.pop() {
-                        self.push(Value::Number(-value));
+                    if let Value::Number(value) = self.stack.pop(current_line)? {
+                        self.stack.push(Value::Number(-value));
                     } else {
-                        return Err(InterpreterError::RuntimeError(
-                            "Bad argument to unary operator, not a number.".to_string(),
-                            current_line,
-                        ));
+                        return runtime_error("Bad argument to negate, not a number.", current_line);
                     }
                 }
 
                 Some(chunk::OpCode::Add) => {
-                    let top = self.peek();
+                    let top = self.stack.peek();
                     if let Value::Number(_) = top {
                         binary_op!(self, +, Number, Number, current_line)
                     } else if let Value::String(_) = top {
-                        let aa = self.pop();
-                        let b = self.pop();
+                        let aa = self.stack.pop(current_line)?;
+                        let b = self.stack.pop(current_line)?;
                         if let Value::String(b) = b {
                             let mut a;
                             if let Value::String(aval) = aa {
                                 a = aval;
                             } else {
-                                return Err(InterpreterError::RuntimeError(
-                                    "Bad argument to binary operator, not a number.".to_string(),
-                                    current_line,
-                                ));
+                                panic!("This should be unreachable as we know aa is a string.");
                             }
-                            self.push(Value::String(a + &b))
+                            self.stack.push(Value::String(a + &b))
                         } else if let Value::Number(n) = b {
                             let mut a;
                             if let Value::String(aval) = aa {
                                 a = aval;
                             } else {
-                                return Err(InterpreterError::RuntimeError(
-                                    "Bad argument to binary operator, not a number.".to_string(),
-                                    current_line,
-                                ));
+                                panic!("This should be unreachable as we know aa is a string.");
                             }
                             let mut s = a.clone();
                             s.push(n as u8 as char);
-                            self.push(Value::String(s));
+                            self.stack.push(Value::String(s));
                         } else {
-                            return Err(InterpreterError::RuntimeError(
-                                "Bad argument to binary operator, not a string.".to_string(),
-                                current_line,
-                            ));
+                            return runtime_error("Bad argument to binary operator, string must have string or char on RHS.", current_line);
                         }
                     } else {
-                        return Err(InterpreterError::RuntimeError(
-                            "Bad or mismatched arguments to +".to_string(),
-                            current_line,
-                        ));
+                        return runtime_error("Bad or mismatched arguments to +", current_line);
                     }
                 }
                 Some(chunk::OpCode::Subtract) => binary_op!(self, -, Number, Number, current_line),
@@ -201,35 +235,29 @@ impl VM {
                 Some(chunk::OpCode::Divide) => binary_op!(self, /, Number, Number, current_line),
                 Some(chunk::OpCode::Remainder) => binary_op!(self, %, Number, Number, current_line),
 
-                Some(chunk::OpCode::Print) => println!("{}", self.pop()),
+                Some(chunk::OpCode::Print) => println!("{}", self.stack.pop(current_line)?),
 
                 Some(chunk::OpCode::AssignLocal) => {
                     let number = self.read_byte() as usize + self.locals_base;
                     if number >= self.locals_top {
-                        return Err(InterpreterError::RuntimeError(
-                            "Local store out of range".to_string(),
-                            current_line,
-                        ));
+                        return runtime_error("Local store out of range", current_line);
                     }
-                    self.locals[number as usize] = self.pop();
+                    self.locals[number as usize] = self.stack.pop(current_line)?;
                 }
                 Some(chunk::OpCode::LoadLocal) => {
                     let number = self.read_byte() as usize + self.locals_base;
                     if number >= self.locals_top {
-                        return Err(InterpreterError::RuntimeError(
-                            "Local load out of range".to_string(),
-                            current_line,
-                        ));
+                        return runtime_error("Local load out of range", current_line);
                     }
                     let value = self.locals[number as usize].clone();
-                    self.push(value);
+                    self.stack.push(value);
                 }
 
                 Some(chunk::OpCode::PushNil) => {
-                    self.push(Value::Nil);
+                    self.stack.push(Value::Nil);
                 }
                 Some(chunk::OpCode::Pop) => {
-                    self.pop();
+                    self.stack.pop(current_line)?;
                 }
 
                 Some(chunk::OpCode::FunctionEntry) => {
@@ -249,7 +277,7 @@ impl VM {
 
                 Some(chunk::OpCode::JumpIfFalse) => {
                     let target = self.read_signed_16();
-                    let value = self.pop();
+                    let value = self.stack.pop(current_line)?;
                     if value.is_falsey() {
                         self.ip = (self.ip as isize + target as isize) as usize;
                     }
@@ -271,121 +299,99 @@ impl VM {
                 }
 
                 Some(chunk::OpCode::TestEqual) => {
-                    let a = self.pop();
-                    let b = self.pop();
-                    self.push(Value::Boolean(a == b));
+                    let a = self.stack.pop(current_line)?;
+                    let b = self.stack.pop(current_line)?;
+                    self.stack.push(Value::Boolean(a == b));
                 }
                 Some(chunk::OpCode::TestNotEqual) => {
-                    let a = self.pop();
-                    let b = self.pop();
-                    self.push(Value::Boolean(a != b));
+                    let a = self.stack.pop(current_line)?;
+                    let b = self.stack.pop(current_line)?;
+                    self.stack.push(Value::Boolean(a != b));
                 }
 
                 Some(chunk::OpCode::Index) => {
-                    let the_value = self.pop();
-                    let indexer = self.pop();
+                    let the_value = self.stack.pop(current_line)?;
+                    let indexer = self.stack.pop(current_line)?;
                     match indexer {
                         Value::String(s) => {
                             let v;
                             if let Value::Number(n) = the_value {
                                 v = n as usize;
                             } else {
-                                return Err(InterpreterError::RuntimeError(
-                                    "Index must be number.".to_string(),
-                                    current_line,
-                                ));
+                                return runtime_error("Index must be number.", current_line);
                             }
                             // Todo: Make this better and maybe utf8 safe.
                             let c = s.into_bytes()[v];
-                            self.push(Value::Number(c as f64));
+                            self.stack.push(Value::Number(c as f64));
                         }
 
                         Value::ReferenceId(id) => {
-                            let to_push;
-                            {
-                                let ref_type = &mut self.heap[id];
-                                match ref_type {
-                                    ReferenceType::Array(ref mut a) => {
-                                        let v;
-                                        if let Value::Number(n) = the_value {
-                                            v = n as usize;
-                                        } else {
-                                            return Err(InterpreterError::RuntimeError(
-                                                "Index must be number.".to_string(),
-                                                current_line,
-                                            ));
-                                        }
-                                        if v >= a.len() {
-                                            a.resize(v + 1, Value::Nil);
-                                        }
-                                        to_push = a[v].clone();
+                            let ref_type = &mut self.heap[id];
+                            match ref_type {
+                                ReferenceType::Array(ref mut a) => {
+                                    let v = if let Value::Number(n) = the_value {
+                                        n as usize
+                                    } else {
+                                        return runtime_error("Index must be number.", current_line);
+                                    };
+                                    if v >= a.len() {
+                                        a.resize(v + 1, Value::Nil);
                                     }
-                                    ReferenceType::Map(m) => {
-                                        let hashable_value =
-                                            HashableValue::try_from(&the_value, current_line)
-                                                .unwrap();
-                                        to_push =
-                                            m.get(&hashable_value).unwrap_or(&Value::Nil).clone();
-                                    }
-                                    _ => {
-                                        return Err(InterpreterError::RuntimeError(
-                                            "Don't know how to index that.".to_string(),
-                                            current_line,
-                                        ));
-                                    }
+                                    self.stack.push(a[v].clone());
+                                }
+                                ReferenceType::Map(m) => {
+                                    let hashable_value =
+                                        HashableValue::try_from(&the_value, current_line).unwrap();
+                                    self.stack.push(
+                                        m.get(&hashable_value).unwrap_or(&Value::Nil).clone(),
+                                    );
+                                }
+                                _ => {
+                                    return runtime_error(
+                                        "Don't know how to index that.",
+                                        current_line,
+                                    );
                                 }
                             }
-                            self.push(to_push);
                         }
 
                         _ => {
-                            return Err(InterpreterError::RuntimeError(
-                                "Don't know how to index that.".to_string(),
-                                current_line,
-                            ));
+                            return runtime_error("Don't know how to index that.", current_line);
                         }
                     }
                 }
 
                 Some(chunk::OpCode::NewArray) => {
                     let id = self.new_reference_type(ReferenceType::Array(Vec::new()));
-                    self.push(Value::ReferenceId(id));
+                    self.stack.push(Value::ReferenceId(id));
                 }
 
                 Some(chunk::OpCode::PushArray) => {
-                    let value = self.pop();
-                    let array = self.pop();
+                    let value = self.stack.pop(current_line)?;
+                    let array = self.stack.pop(current_line)?;
                     match array {
                         Value::ReferenceId(id) => {
-                            {
-                                let ref_type = &mut self.heap[id];
-                                match ref_type {
-                                    ReferenceType::Array(ref mut a) => {
-                                        a.push(value);
-                                    }
-                                    _ => {
-                                        return Err(InterpreterError::RuntimeError(
-                                            "Array push on non-array".to_string(),
-                                            current_line,
-                                        ));
-                                    }
+                            let ref_type = &mut self.heap[id];
+                            match ref_type {
+                                ReferenceType::Array(ref mut a) => {
+                                    a.push(value);
+                                }
+                                _ => {
+                                    return runtime_error("Array push on non-array", current_line);
                                 }
                             }
-                            self.push(Value::ReferenceId(id));
+                            self.stack.push(Value::ReferenceId(id));
                         }
                         _ => {
-                            return Err(InterpreterError::RuntimeError(
-                                "Array push on non-array".to_string(),
-                                current_line,
-                            ));
+                            return runtime_error("Array push on non-array", current_line);
                         }
                     }
                 }
 
                 Some(chunk::OpCode::IndexAssign) => {
-                    let new_value = self.pop();
-                    let index_value = self.pop();
-                    let indexer = self.pop();
+                    let new_value = self.stack.pop(current_line)?;
+                    let index_value = self.stack.pop(current_line)?;
+                    let indexer = self.stack.pop(current_line)?;
                     match indexer {
                         Value::ReferenceId(id) => {
                             let ref_type = &mut self.heap[id];
@@ -431,8 +437,8 @@ impl VM {
                 }
 
                 Some(chunk::OpCode::BuiltinCall) => {
-                    let builtin = self.pop();
-                    let callee = self.pop();
+                    let builtin = self.stack.pop(current_line)?;
+                    let callee = self.stack.pop(current_line)?;
                     let builtin = if let Value::String(s) = builtin {
                         s
                     } else {
@@ -443,7 +449,7 @@ impl VM {
                     };
 
                     if builtin == "to_string" {
-                        self.push(Value::String(format!("{}", callee)));
+                        self.stack.push(Value::String(format!("{}", callee)));
                         continue;
                     }
 
@@ -459,21 +465,13 @@ impl VM {
                                             to_push =
                                                 ValueOrRef::Value(Value::Number(a.len() as f64));
                                         } else if builtin == "push" {
-                                            let value = {
-                                                // Hack, copied pop
-                                                self.stack_top -= 1;
-                                                self.stack[self.stack_top].clone()
-                                            };
+                                            let value = self.stack.pop(current_line)?;
                                             a.push(value);
                                             to_push = ValueOrRef::Value(Value::Nil);
                                         } else if builtin == "pop" {
                                             to_push = ValueOrRef::Value(a.pop().unwrap());
                                         } else if builtin == "remove" {
-                                            let to_remove = {
-                                                // Hack, copied pop
-                                                self.stack_top -= 1;
-                                                self.stack[self.stack_top].clone()
-                                            };
+                                            let to_remove = self.stack.pop(current_line)?;
                                             if let Value::Number(n) = to_remove {
                                                 to_push = ValueOrRef::Value(a.remove(n as usize));
                                             } else {
@@ -483,16 +481,8 @@ impl VM {
                                                 ));
                                             }
                                         } else if builtin == "insert" {
-                                            let to_insert_val = {
-                                                // Hack, copied pop
-                                                self.stack_top -= 1;
-                                                self.stack[self.stack_top].clone()
-                                            };
-                                            let to_insert = {
-                                                // Hack, copied pop
-                                                self.stack_top -= 1;
-                                                self.stack[self.stack_top].clone()
-                                            };
+                                            let to_insert_val = self.stack.pop(current_line)?;
+                                            let to_insert = self.stack.pop(current_line)?;
                                             if let Value::Number(n) = to_insert {
                                                 a.insert(n as usize, to_insert_val);
                                                 to_push = ValueOrRef::Value(Value::Nil);
@@ -513,11 +503,7 @@ impl VM {
                                             });
                                             to_push = ValueOrRef::Value(Value::ReferenceId(id));
                                         } else if builtin == "resize" {
-                                            let v = {
-                                                // Hack, copied pop
-                                                self.stack_top -= 1;
-                                                self.stack[self.stack_top].clone()
-                                            };
+                                            let v = self.stack.pop(current_line)?;
                                             let v = if let Value::Number(n) = v {
                                                 n
                                             } else {
@@ -537,8 +523,8 @@ impl VM {
                                         let mut args = Vec::new();
                                         for _ in 0..arity {
                                             // Hack: copied pop
-                                            self.stack_top -= 1;
-                                            args.push(self.stack[self.stack_top].clone())
+
+                                            args.push(self.stack.pop(current_line)?)
                                         }
                                         let rt = e.call(&builtin, args);
                                         if let ReferenceType::Nil = rt {
@@ -556,28 +542,29 @@ impl VM {
                                 }
                             }
                             match to_push {
-                                ValueOrRef::Value(v) => self.push(v),
+                                ValueOrRef::Value(v) => self.stack.push(v),
                                 ValueOrRef::Ref(r) => {
                                     let id = self.new_reference_type(r);
-                                    self.push(Value::ReferenceId(id));
+                                    self.stack.push(Value::ReferenceId(id));
                                 }
                             }
                         }
 
                         Value::String(s) => {
                             if builtin == "len" {
-                                self.push(Value::Number(s.len() as f64));
+                                self.stack.push(Value::Number(s.len() as f64));
                             } else if builtin == "readFile" {
-                                self.push(Value::String(std::fs::read_to_string(s).unwrap()));
+                                self.stack
+                                    .push(Value::String(std::fs::read_to_string(s).unwrap()));
                             } else if builtin == "split" {
-                                let sep = self.pop();
+                                let sep = self.stack.pop(current_line)?;
                                 if let Value::String(sep) = sep {
                                     let parts: Vec<_> = s
                                         .split(&sep)
                                         .map(|p| Value::String(p.to_string()))
                                         .collect();
                                     let id = self.new_reference_type(ReferenceType::Array(parts));
-                                    self.push(Value::ReferenceId(id));
+                                    self.stack.push(Value::ReferenceId(id));
                                 } else {
                                     return Err(InterpreterError::RuntimeError(
                                         "Expected string argument to split".to_string(),
@@ -585,12 +572,12 @@ impl VM {
                                     ));
                                 }
                             } else if builtin == "parseNumber" {
-                                self.push(Value::Number(s.parse().unwrap()));
+                                self.stack.push(Value::Number(s.parse().unwrap()));
                             } else if builtin == "regex" {
                                 let id = self.new_reference_type(ReferenceType::External(
                                     Box::new(regex::Regex::new(&s).unwrap()),
                                 ));
-                                self.push(Value::ReferenceId(id));
+                                self.stack.push(Value::ReferenceId(id));
                             } else {
                                 return Err(InterpreterError::RuntimeError(
                                     "Unknown string builtin".to_string(),
@@ -601,7 +588,7 @@ impl VM {
 
                         Value::Number(n) => {
                             if builtin == "floor" {
-                                self.push(Value::Number(n.floor()));
+                                self.stack.push(Value::Number(n.floor()));
                             }
                         }
 
@@ -615,7 +602,7 @@ impl VM {
                 }
 
                 Some(chunk::OpCode::MakeRange) => {
-                    let right = if let Value::Number(n) = self.pop() {
+                    let right = if let Value::Number(n) = self.stack.pop(current_line)? {
                         n
                     } else {
                         return Err(InterpreterError::RuntimeError(
@@ -623,7 +610,7 @@ impl VM {
                             current_line,
                         ));
                     };
-                    let left = if let Value::Number(n) = self.pop() {
+                    let left = if let Value::Number(n) = self.stack.pop(current_line)? {
                         n
                     } else {
                         return Err(InterpreterError::RuntimeError(
@@ -631,19 +618,19 @@ impl VM {
                             current_line,
                         ));
                     };
-                    self.push(Value::Range(left, right))
+                    self.stack.push(Value::Range(left, right))
                 }
 
                 Some(chunk::OpCode::ForLoop) => {
                     let local_n = self.read_byte();
                     let jump_target = self.read_signed_16();
                     let target_ip = (self.ip as isize + jump_target as isize) as usize;
-                    let range = self.pop();
+                    let range = self.stack.pop(current_line)?;
                     match range {
                         Value::Range(l, r) => {
                             if l < r {
                                 self.locals[local_n as usize + self.locals_base] = Value::Number(l);
-                                self.push(Value::Range(l + 1.0, r));
+                                self.stack.push(Value::Range(l + 1.0, r));
                             } else {
                                 self.ip = target_ip;
                             }
@@ -683,7 +670,7 @@ impl VM {
                                 }
                             }
                             if let Some(p) = to_push {
-                                self.push(p);
+                                self.stack.push(p);
                             }
                         }
                         Value::MapForContext(keys, l, r) => {
@@ -696,7 +683,7 @@ impl VM {
                                 self.ip = (self.ip as isize + jump_target as isize) as usize;
                             }
                             if let Some(p) = to_push {
-                                self.push(p);
+                                self.stack.push(p);
                             }
                         }
                         _ => {
@@ -710,39 +697,37 @@ impl VM {
 
                 Some(chunk::OpCode::PopMulti) => {
                     let n = self.read_byte();
-                    self.stack_top -= n as usize;
+                    self.stack.pop_multi(n as usize, current_line)?;
                 }
 
                 Some(chunk::OpCode::PushTrue) => {
-                    self.push(Value::Boolean(true));
+                    self.stack.push(Value::Boolean(true));
                 }
 
                 Some(chunk::OpCode::PushFalse) => {
-                    self.push(Value::Boolean(false));
+                    self.stack.push(Value::Boolean(false));
                 }
 
                 Some(chunk::OpCode::NewMap) => {
                     let id = self.new_reference_type(ReferenceType::Map(HashMap::new()));
-                    self.push(Value::ReferenceId(id));
+                    self.stack.push(Value::ReferenceId(id));
                 }
 
                 Some(chunk::OpCode::PushMap) => {
-                    let value = self.pop();
-                    let key = self.pop();
-                    let map = self.pop();
+                    let value = self.stack.pop(current_line)?;
+                    let key = self.stack.pop(current_line)?;
+                    let map = self.stack.pop(current_line)?;
                     if let Value::ReferenceId(id) = map {
-                        {
-                            let map = &mut self.heap[id];
-                            if let ReferenceType::Map(ref mut m) = map {
-                                m.insert(HashableValue::try_from(&key, current_line)?, value);
-                            } else {
-                                return Err(InterpreterError::RuntimeError(
-                                    "Map push on non-map".to_string(),
-                                    current_line,
-                                ));
-                            }
+                        let map = &mut self.heap[id];
+                        if let ReferenceType::Map(ref mut m) = map {
+                            m.insert(HashableValue::try_from(&key, current_line)?, value);
+                        } else {
+                            return Err(InterpreterError::RuntimeError(
+                                "Map push on non-map".to_string(),
+                                current_line,
+                            ));
                         }
-                        self.push(Value::ReferenceId(id));
+                        self.stack.push(Value::ReferenceId(id));
                     } else {
                         return Err(InterpreterError::RuntimeError(
                             "Map push on non-map".to_string(),
@@ -752,24 +737,25 @@ impl VM {
                 }
 
                 Some(chunk::OpCode::Not) => {
-                    let value = self.pop();
-                    self.push(Value::Boolean(value.is_falsey()));
+                    let value = self.stack.pop(current_line)?;
+                    self.stack.push(Value::Boolean(value.is_falsey()));
                 }
 
                 Some(chunk::OpCode::And) => {
-                    let a = self.pop();
-                    let b = self.pop();
-                    self.push(Value::Boolean(!a.is_falsey() && !b.is_falsey()));
+                    let a = self.stack.pop(current_line)?;
+                    let b = self.stack.pop(current_line)?;
+                    self.stack
+                        .push(Value::Boolean(!a.is_falsey() && !b.is_falsey()));
                 }
 
                 Some(chunk::OpCode::Dup) => {
-                    let val = self.peek();
-                    self.push(val);
+                    let val = self.stack.peek();
+                    self.stack.push(val);
                 }
 
                 Some(chunk::OpCode::JumpIfTrue) => {
                     let target = self.read_signed_16();
-                    let value = self.pop();
+                    let value = self.stack.pop(current_line)?;
                     if value.is_truey() {
                         self.ip = (self.ip as isize + target as isize) as usize;
                     }
@@ -803,20 +789,6 @@ impl VM {
     pub fn read_constant(&mut self) -> Value {
         let constant_number = self.read_byte();
         self.chunk.constants[constant_number as usize].clone()
-    }
-
-    pub fn push(&mut self, value: Value) {
-        self.stack[self.stack_top] = value;
-        self.stack_top += 1
-    }
-
-    pub fn pop(&mut self) -> Value {
-        self.stack_top -= 1;
-        self.stack[self.stack_top].clone()
-    }
-
-    pub fn peek(&mut self) -> Value {
-        self.stack[self.stack_top - 1].clone()
     }
 
     pub fn new_reference_type(&mut self, value: ReferenceType) -> usize {
