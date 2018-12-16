@@ -557,6 +557,8 @@ impl VM {
                         Value::Number(n) => {
                             if builtin == "floor" {
                                 self.stack.push(Value::Number(n.floor()));
+                            } else if builtin == "abs" {
+                                self.stack.push(Value::Number(n.abs()));
                             } else {
                                 return runtime_error("Unknown number builtin", current_line);
                             }
