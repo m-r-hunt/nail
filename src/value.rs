@@ -147,7 +147,7 @@ impl Value {
 
 pub trait ExternalType {
     fn get_arity(&self, name: &str) -> usize;
-    fn call(&mut self, name: &str, args: Vec<Value>) -> ReferenceType;
+    fn call(&mut self, name: &str, args: Vec<Value>) -> ValueOrRef;
 }
 
 use regex::Regex;
@@ -160,18 +160,18 @@ impl ExternalType for Regex {
         }
     }
 
-    fn call(&mut self, name: &str, args: Vec<Value>) -> ReferenceType {
+    fn call(&mut self, name: &str, args: Vec<Value>) -> ValueOrRef {
         if name == "match" {
             if let Value::String(ref s) = args[0] {
                 match self.captures(&s) {
                     Some(c) => {
-                        return ReferenceType::Array(
+                        return ValueOrRef::Ref(ReferenceType::Array(
                             c.iter()
                                 .map(|e| Value::String(e.unwrap().as_str().to_string()))
                                 .collect(),
-                        )
+                        ))
                     }
-                    None => return ReferenceType::Nil,
+                    None => return ValueOrRef::Value(Value::Nil),
                 }
             } else {
                 panic!("Bad call to regex match");
@@ -183,7 +183,6 @@ impl ExternalType for Regex {
 }
 
 pub enum ReferenceType {
-    Nil,
     Array(Vec<Value>),
     Map(HashMap<HashableValue, Value>),
     External(Box<dyn ExternalType>),

@@ -507,12 +507,15 @@ impl VM {
                                 for _ in 0..arity {
                                     args.push(self.stack.pop(current_line)?)
                                 }
-                                let rt = e.call(&builtin, args);
-                                if let ReferenceType::Nil = rt {
-                                    self.stack.push(Value::Nil);
-                                } else {
-                                    let id = self.new_reference_type(rt);
-                                    self.stack.push(Value::ReferenceId(id));
+                                let result = e.call(&builtin, args);
+                                match result {
+                                    ValueOrRef::Value(v) => {
+                                        self.stack.push(v);
+                                    }
+                                    ValueOrRef::Ref(rt) => {
+                                        let id = self.new_reference_type(rt);
+                                        self.stack.push(Value::ReferenceId(id));
+                                    }
                                 }
                             }
                             _ => return runtime_error("Unknown builtin", current_line),
