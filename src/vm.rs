@@ -457,7 +457,6 @@ impl VM {
                     match callee {
                         Value::ReferenceId(id) => {
                             let ref_type = &mut self.heap[id];
-                            let mut new_ref_type = None;
                             match ref_type {
                                 ReferenceType::Array(ref mut a) => {
                                     if builtin == "len" {
@@ -527,7 +526,8 @@ impl VM {
                                     if let ReferenceType::Nil = rt {
                                         self.stack.push(Value::Nil);
                                     } else {
-                                        new_ref_type = Some(rt);
+                                        let id = self.new_reference_type(rt);
+                                        self.stack.push(Value::ReferenceId(id));
                                     }
                                 }
                                 _ => {
@@ -536,10 +536,6 @@ impl VM {
                                         current_line,
                                     ))
                                 }
-                            }
-                            if let Some(rt) = new_ref_type {
-                                let id = self.new_reference_type(rt);
-                                self.stack.push(Value::ReferenceId(id));
                             }
                         }
 
