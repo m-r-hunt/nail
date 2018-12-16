@@ -6,7 +6,7 @@ pub enum NotloxError {
 }
 
 impl std::fmt::Display for NotloxError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use self::NotloxError::*;
         write!(
             f,

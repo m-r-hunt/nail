@@ -1,4 +1,4 @@
-extern crate notlox;
+use notlox;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
