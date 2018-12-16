@@ -401,10 +401,7 @@ impl VM {
                                     if let Value::Number(value) = index_value {
                                         n = value as usize;
                                     } else {
-                                        return Err(InterpreterError::RuntimeError(
-                                            "Index must be number.".to_string(),
-                                            current_line,
-                                        ));
+                                        return runtime_error("Index must be number.", current_line);
                                     }
                                     if n >= a.len() {
                                         a.resize(n + 1, Value::Nil);
@@ -419,19 +416,19 @@ impl VM {
                                 }
 
                                 _ => {
-                                    return Err(InterpreterError::RuntimeError(
-                                        "Don't know how to index assign that".to_string(),
+                                    return runtime_error(
+                                        "Don't know how to index assign that",
                                         current_line,
-                                    ));
+                                    )
                                 }
                             }
                         }
 
                         _ => {
-                            return Err(InterpreterError::RuntimeError(
-                                "Don't know how to index assign that".to_string(),
+                            return runtime_error(
+                                "Don't know how to index assign that",
                                 current_line,
-                            ));
+                            )
                         }
                     }
                 }
@@ -442,10 +439,7 @@ impl VM {
                     let builtin = if let Value::String(s) = builtin {
                         s
                     } else {
-                        return Err(InterpreterError::RuntimeError(
-                            "Expected builtin name".to_string(),
-                            current_line,
-                        ));
+                        return runtime_error("Expected builtin name", current_line);
                     };
 
                     if builtin == "to_string" {
@@ -455,89 +449,74 @@ impl VM {
 
                     // TODO: Some kind of data driven solution rather than hardcoded ifs.
                     match callee {
-                        Value::ReferenceId(id) => {
-                            let ref_type = &mut self.heap[id];
-                            match ref_type {
-                                ReferenceType::Array(ref mut a) => {
-                                    if builtin == "len" {
-                                        self.stack.push(Value::Number(a.len() as f64));
-                                    } else if builtin == "push" {
-                                        let value = self.stack.pop(current_line)?;
-                                        a.push(value);
-                                        self.stack.push(Value::Nil);
-                                    } else if builtin == "pop" {
-                                        self.stack.push(a.pop().unwrap());
-                                    } else if builtin == "remove" {
-                                        let to_remove = self.stack.pop(current_line)?;
-                                        if let Value::Number(n) = to_remove {
-                                            self.stack.push(a.remove(n as usize));
-                                        } else {
-                                            return Err(InterpreterError::RuntimeError(
-                                                "Attempt to remove non-integer index from array"
-                                                    .to_string(),
-                                                current_line,
-                                            ));
-                                        }
-                                    } else if builtin == "insert" {
-                                        let to_insert_val = self.stack.pop(current_line)?;
-                                        let to_insert = self.stack.pop(current_line)?;
-                                        if let Value::Number(n) = to_insert {
-                                            a.insert(n as usize, to_insert_val);
-                                            self.stack.push(Value::Nil);
-                                        } else {
-                                            return Err(InterpreterError::RuntimeError(
-                                                "Attempt to insert non-integer index from array"
-                                                    .to_string(),
-                                                current_line,
-                                            ));
-                                        }
-                                    } else if builtin == "sort" {
-                                        a.sort_by(|a, b| {
-                                            HashableValue::try_from(a, current_line).unwrap().cmp(
-                                                &HashableValue::try_from(b, current_line).unwrap(),
-                                            )
-                                        });
-                                        self.stack.push(Value::ReferenceId(id));
-                                    } else if builtin == "resize" {
-                                        let v = self.stack.pop(current_line)?;
-                                        let v = if let Value::Number(n) = v {
-                                            n
-                                        } else {
-                                            panic!("Bad arg to array resize.");
-                                        };
-                                        a.resize(v as usize, Value::Nil);
-                                        self.stack.push(Value::Nil);
+                        Value::ReferenceId(id) => match &mut self.heap[id] {
+                            ReferenceType::Array(ref mut a) => {
+                                if builtin == "len" {
+                                    self.stack.push(Value::Number(a.len() as f64));
+                                } else if builtin == "push" {
+                                    let value = self.stack.pop(current_line)?;
+                                    a.push(value);
+                                    self.stack.push(Value::Nil);
+                                } else if builtin == "pop" {
+                                    self.stack.push(a.pop().unwrap());
+                                } else if builtin == "remove" {
+                                    let to_remove = self.stack.pop(current_line)?;
+                                    if let Value::Number(n) = to_remove {
+                                        self.stack.push(a.remove(n as usize));
                                     } else {
-                                        return Err(InterpreterError::RuntimeError(
-                                            "Unknown array builtin".to_string(),
+                                        return runtime_error(
+                                            "Attempt to remove non-integer index from array",
                                             current_line,
-                                        ));
+                                        );
                                     }
-                                }
-                                ReferenceType::External(ref mut e) => {
-                                    let arity = e.get_arity(&builtin);
-                                    let mut args = Vec::new();
-                                    for _ in 0..arity {
-                                        // Hack: copied pop
-
-                                        args.push(self.stack.pop(current_line)?)
-                                    }
-                                    let rt = e.call(&builtin, args);
-                                    if let ReferenceType::Nil = rt {
+                                } else if builtin == "insert" {
+                                    let to_insert_val = self.stack.pop(current_line)?;
+                                    let to_insert = self.stack.pop(current_line)?;
+                                    if let Value::Number(n) = to_insert {
+                                        a.insert(n as usize, to_insert_val);
                                         self.stack.push(Value::Nil);
                                     } else {
-                                        let id = self.new_reference_type(rt);
-                                        self.stack.push(Value::ReferenceId(id));
+                                        return runtime_error(
+                                            "Attempt to insert non-integer index from array",
+                                            current_line,
+                                        );
                                     }
-                                }
-                                _ => {
-                                    return Err(InterpreterError::RuntimeError(
-                                        "Unknown builtin".to_string(),
-                                        current_line,
-                                    ))
+                                } else if builtin == "sort" {
+                                    a.sort_by(|a, b| {
+                                        HashableValue::try_from(a, current_line)
+                                            .unwrap()
+                                            .cmp(&HashableValue::try_from(b, current_line).unwrap())
+                                    });
+                                    self.stack.push(Value::ReferenceId(id));
+                                } else if builtin == "resize" {
+                                    let v = self.stack.pop(current_line)?;
+                                    let v = if let Value::Number(n) = v {
+                                        n
+                                    } else {
+                                        panic!("Bad arg to array resize.");
+                                    };
+                                    a.resize(v as usize, Value::Nil);
+                                    self.stack.push(Value::Nil);
+                                } else {
+                                    return runtime_error("Unknown array builtin", current_line);
                                 }
                             }
-                        }
+                            ReferenceType::External(ref mut e) => {
+                                let arity = e.get_arity(&builtin);
+                                let mut args = Vec::new();
+                                for _ in 0..arity {
+                                    args.push(self.stack.pop(current_line)?)
+                                }
+                                let rt = e.call(&builtin, args);
+                                if let ReferenceType::Nil = rt {
+                                    self.stack.push(Value::Nil);
+                                } else {
+                                    let id = self.new_reference_type(rt);
+                                    self.stack.push(Value::ReferenceId(id));
+                                }
+                            }
+                            _ => return runtime_error("Unknown builtin", current_line),
+                        },
 
                         Value::String(s) => {
                             if builtin == "len" {
@@ -555,10 +534,10 @@ impl VM {
                                     let id = self.new_reference_type(ReferenceType::Array(parts));
                                     self.stack.push(Value::ReferenceId(id));
                                 } else {
-                                    return Err(InterpreterError::RuntimeError(
-                                        "Expected string argument to split".to_string(),
+                                    return runtime_error(
+                                        "Expected string argument to split",
                                         current_line,
-                                    ));
+                                    );
                                 }
                             } else if builtin == "parseNumber" {
                                 self.stack.push(Value::Number(s.parse().unwrap()));
@@ -568,25 +547,19 @@ impl VM {
                                 ));
                                 self.stack.push(Value::ReferenceId(id));
                             } else {
-                                return Err(InterpreterError::RuntimeError(
-                                    "Unknown string builtin".to_string(),
-                                    current_line,
-                                ));
+                                return runtime_error("Unknown string builtin", current_line);
                             }
                         }
 
                         Value::Number(n) => {
                             if builtin == "floor" {
                                 self.stack.push(Value::Number(n.floor()));
+                            } else {
+                                return runtime_error("Unknown number builtin", current_line);
                             }
                         }
 
-                        _ => {
-                            return Err(InterpreterError::RuntimeError(
-                                "Unknown builtin".to_string(),
-                                current_line,
-                            ))
-                        }
+                        _ => return runtime_error("Unknown builtin", current_line),
                     }
                 }
 
@@ -594,18 +567,12 @@ impl VM {
                     let right = if let Value::Number(n) = self.stack.pop(current_line)? {
                         n
                     } else {
-                        return Err(InterpreterError::RuntimeError(
-                            "Expected number in range bounds".to_string(),
-                            current_line,
-                        ));
+                        return runtime_error("Expected number in range bounds", current_line);
                     };
                     let left = if let Value::Number(n) = self.stack.pop(current_line)? {
                         n
                     } else {
-                        return Err(InterpreterError::RuntimeError(
-                            "Expected number in range bounds".to_string(),
-                            current_line,
-                        ));
+                        return runtime_error("Expected number in range bounds", current_line);
                     };
                     self.stack.push(Value::Range(left, right))
                 }
@@ -624,63 +591,44 @@ impl VM {
                                 self.ip = target_ip;
                             }
                         }
-                        Value::ReferenceId(id) => {
-                            let mut to_push = None;
-                            {
-                                let ref_type = &mut self.heap[id];
-                                match ref_type {
-                                    ReferenceType::Array(a) => {
-                                        if a.len() > 0 {
-                                            self.locals[local_n as usize + self.locals_base] =
-                                                Value::Number(0.0);
-                                            to_push = Some(Value::Range(1.0, a.len() as f64));
-                                        } else {
-                                            self.ip = target_ip;
-                                        }
-                                    }
-                                    ReferenceType::Map(m) => {
-                                        let keys: Vec<_> = m.keys().map(|e| e.clone()).collect();
-                                        let len = keys.len();
-                                        if len > 0 {
-                                            self.locals[local_n as usize + self.locals_base] =
-                                                Value::from(&keys[0]);
-                                            to_push =
-                                                Some(Value::MapForContext(keys, 1.0, len as f64));
-                                        } else {
-                                            self.ip = target_ip;
-                                        }
-                                    }
-                                    _ => {
-                                        return Err(InterpreterError::RuntimeError(
-                                            "Don't know how to for over that".to_string(),
-                                            current_line,
-                                        ))
-                                    }
+                        Value::ReferenceId(id) => match &mut self.heap[id] {
+                            ReferenceType::Array(a) => {
+                                if a.len() > 0 {
+                                    self.locals[local_n as usize + self.locals_base] =
+                                        Value::Number(0.0);
+                                    self.stack.push(Value::Range(1.0, a.len() as f64));
+                                } else {
+                                    self.ip = target_ip;
                                 }
                             }
-                            if let Some(p) = to_push {
-                                self.stack.push(p);
+                            ReferenceType::Map(m) => {
+                                let keys: Vec<_> = m.keys().map(|e| e.clone()).collect();
+                                let len = keys.len();
+                                if len > 0 {
+                                    self.locals[local_n as usize + self.locals_base] =
+                                        Value::from(&keys[0]);
+                                    self.stack.push(Value::MapForContext(keys, 1.0, len as f64));
+                                } else {
+                                    self.ip = target_ip;
+                                }
                             }
-                        }
+                            _ => {
+                                return runtime_error(
+                                    "Don't know how to for over that",
+                                    current_line,
+                                )
+                            }
+                        },
                         Value::MapForContext(keys, l, r) => {
-                            let mut to_push = None;
                             if l < r {
                                 self.locals[local_n as usize + self.locals_base] =
                                     Value::from(&keys[l as usize]);
-                                to_push = Some(Value::MapForContext(keys, l + 1.0, r));
+                                self.stack.push(Value::MapForContext(keys, l + 1.0, r));
                             } else {
                                 self.ip = (self.ip as isize + jump_target as isize) as usize;
                             }
-                            if let Some(p) = to_push {
-                                self.stack.push(p);
-                            }
                         }
-                        _ => {
-                            return Err(InterpreterError::RuntimeError(
-                                "Don't know how to for over that".to_string(),
-                                current_line,
-                            ))
-                        }
+                        _ => return runtime_error("Don't know how to for over that", current_line),
                     }
                 }
 
@@ -711,17 +659,11 @@ impl VM {
                         if let ReferenceType::Map(ref mut m) = map {
                             m.insert(HashableValue::try_from(&key, current_line)?, value);
                         } else {
-                            return Err(InterpreterError::RuntimeError(
-                                "Map push on non-map".to_string(),
-                                current_line,
-                            ));
+                            return runtime_error("Map push on non-map", current_line);
                         }
                         self.stack.push(Value::ReferenceId(id));
                     } else {
-                        return Err(InterpreterError::RuntimeError(
-                            "Map push on non-map".to_string(),
-                            current_line,
-                        ));
+                        return runtime_error("Map push on non-map", current_line);
                     }
                 }
 
@@ -731,6 +673,7 @@ impl VM {
                 }
 
                 Some(chunk::OpCode::And) => {
+                    println!("!!! VM Warning: Deprecated OpCode::And !!!");
                     let a = self.stack.pop(current_line)?;
                     let b = self.stack.pop(current_line)?;
                     self.stack
@@ -750,37 +693,32 @@ impl VM {
                     }
                 }
 
-                None => {
-                    return Err(InterpreterError::RuntimeError(
-                        "Bad instruction".to_string(),
-                        current_line,
-                    ))
-                }
+                None => return runtime_error("Bad instruction", current_line),
             }
         }
     }
 
-    pub fn read_byte(&mut self) -> u8 {
+    fn read_byte(&mut self) -> u8 {
         self.ip += 1;
         self.chunk.code[self.ip - 1]
     }
 
-    pub fn read_signed_byte(&mut self) -> i8 {
+    fn _read_signed_byte(&mut self) -> i8 {
         self.read_byte() as i8
     }
 
-    pub fn read_signed_16(&mut self) -> i16 {
+    fn read_signed_16(&mut self) -> i16 {
         let number = self.read_byte() as usize;
         let number2 = self.read_byte() as usize;
         (number | number2 << 8) as i16
     }
 
-    pub fn read_constant(&mut self) -> Value {
+    fn read_constant(&mut self) -> Value {
         let constant_number = self.read_byte();
         self.chunk.constants[constant_number as usize].clone()
     }
 
-    pub fn new_reference_type(&mut self, value: ReferenceType) -> usize {
+    fn new_reference_type(&mut self, value: ReferenceType) -> usize {
         self.heap.push(value);
         return self.heap.len() - 1;
     }
