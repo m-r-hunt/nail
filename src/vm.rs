@@ -101,13 +101,13 @@ fn runtime_error(message: &str, line: usize) -> Result<Value, InterpreterError> 
 macro_rules! binary_op {
     ( $self:expr, $op:tt, $type: ident, $ret:ident, $line:expr ) => {
         {
-            let mut a;
+            let a;
             if let Value::$type(aval) = $self.stack.pop($line)? {
                 a = aval;
             } else {
                 return runtime_error("Bad argument to binary operator, not a number.", $line);
             }
-            let mut b;
+            let b;
             if let Value::$type(bval) = $self.stack.pop($line)? {
                 b = bval;
             } else {
@@ -206,7 +206,7 @@ impl VM {
                         let aa = self.stack.pop(current_line)?;
                         let b = self.stack.pop(current_line)?;
                         if let Value::String(b) = b {
-                            let mut a;
+                            let a;
                             if let Value::String(aval) = aa {
                                 a = aval;
                             } else {
@@ -214,7 +214,7 @@ impl VM {
                             }
                             self.stack.push(Value::String(a + &b))
                         } else if let Value::Number(n) = b {
-                            let mut a;
+                            let a;
                             if let Value::String(aval) = aa {
                                 a = aval;
                             } else {
@@ -456,97 +456,90 @@ impl VM {
                     // TODO: Some kind of data driven solution rather than hardcoded ifs.
                     match callee {
                         Value::ReferenceId(id) => {
-                            let to_push;
-                            {
-                                let ref_type = &mut self.heap[id];
-                                match ref_type {
-                                    ReferenceType::Array(ref mut a) => {
-                                        if builtin == "len" {
-                                            to_push =
-                                                ValueOrRef::Value(Value::Number(a.len() as f64));
-                                        } else if builtin == "push" {
-                                            let value = self.stack.pop(current_line)?;
-                                            a.push(value);
-                                            to_push = ValueOrRef::Value(Value::Nil);
-                                        } else if builtin == "pop" {
-                                            to_push = ValueOrRef::Value(a.pop().unwrap());
-                                        } else if builtin == "remove" {
-                                            let to_remove = self.stack.pop(current_line)?;
-                                            if let Value::Number(n) = to_remove {
-                                                to_push = ValueOrRef::Value(a.remove(n as usize));
-                                            } else {
-                                                return Err(InterpreterError::RuntimeError(
-                                                    "Attempt to remove non-integer index from array".to_string(),
-                                                    current_line,
-                                                ));
-                                            }
-                                        } else if builtin == "insert" {
-                                            let to_insert_val = self.stack.pop(current_line)?;
-                                            let to_insert = self.stack.pop(current_line)?;
-                                            if let Value::Number(n) = to_insert {
-                                                a.insert(n as usize, to_insert_val);
-                                                to_push = ValueOrRef::Value(Value::Nil);
-                                            } else {
-                                                return Err(InterpreterError::RuntimeError(
-                                                    "Attempt to insert non-integer index from array".to_string(),
-                                                    current_line,
-                                                ));
-                                            }
-                                        } else if builtin == "sort" {
-                                            a.sort_by(|a, b| {
-                                                HashableValue::try_from(a, current_line)
-                                                    .unwrap()
-                                                    .cmp(
-                                                        &HashableValue::try_from(b, current_line)
-                                                            .unwrap(),
-                                                    )
-                                            });
-                                            to_push = ValueOrRef::Value(Value::ReferenceId(id));
-                                        } else if builtin == "resize" {
-                                            let v = self.stack.pop(current_line)?;
-                                            let v = if let Value::Number(n) = v {
-                                                n
-                                            } else {
-                                                panic!("Bad arg to array resize.");
-                                            };
-                                            a.resize(v as usize, Value::Nil);
-                                            to_push = ValueOrRef::Value(Value::Nil);
+                            let ref_type = &mut self.heap[id];
+                            let mut new_ref_type = None;
+                            match ref_type {
+                                ReferenceType::Array(ref mut a) => {
+                                    if builtin == "len" {
+                                        self.stack.push(Value::Number(a.len() as f64));
+                                    } else if builtin == "push" {
+                                        let value = self.stack.pop(current_line)?;
+                                        a.push(value);
+                                        self.stack.push(Value::Nil);
+                                    } else if builtin == "pop" {
+                                        self.stack.push(a.pop().unwrap());
+                                    } else if builtin == "remove" {
+                                        let to_remove = self.stack.pop(current_line)?;
+                                        if let Value::Number(n) = to_remove {
+                                            self.stack.push(a.remove(n as usize));
                                         } else {
                                             return Err(InterpreterError::RuntimeError(
-                                                "Unknown array builtin".to_string(),
+                                                "Attempt to remove non-integer index from array"
+                                                    .to_string(),
                                                 current_line,
                                             ));
                                         }
-                                    }
-                                    ReferenceType::External(ref mut e) => {
-                                        let arity = e.get_arity(&builtin);
-                                        let mut args = Vec::new();
-                                        for _ in 0..arity {
-                                            // Hack: copied pop
-
-                                            args.push(self.stack.pop(current_line)?)
-                                        }
-                                        let rt = e.call(&builtin, args);
-                                        if let ReferenceType::Nil = rt {
-                                            to_push = ValueOrRef::Value(Value::Nil);
+                                    } else if builtin == "insert" {
+                                        let to_insert_val = self.stack.pop(current_line)?;
+                                        let to_insert = self.stack.pop(current_line)?;
+                                        if let Value::Number(n) = to_insert {
+                                            a.insert(n as usize, to_insert_val);
+                                            self.stack.push(Value::Nil);
                                         } else {
-                                            to_push = ValueOrRef::Ref(rt);
+                                            return Err(InterpreterError::RuntimeError(
+                                                "Attempt to insert non-integer index from array"
+                                                    .to_string(),
+                                                current_line,
+                                            ));
                                         }
-                                    }
-                                    _ => {
+                                    } else if builtin == "sort" {
+                                        a.sort_by(|a, b| {
+                                            HashableValue::try_from(a, current_line).unwrap().cmp(
+                                                &HashableValue::try_from(b, current_line).unwrap(),
+                                            )
+                                        });
+                                        self.stack.push(Value::ReferenceId(id));
+                                    } else if builtin == "resize" {
+                                        let v = self.stack.pop(current_line)?;
+                                        let v = if let Value::Number(n) = v {
+                                            n
+                                        } else {
+                                            panic!("Bad arg to array resize.");
+                                        };
+                                        a.resize(v as usize, Value::Nil);
+                                        self.stack.push(Value::Nil);
+                                    } else {
                                         return Err(InterpreterError::RuntimeError(
-                                            "Unknown builtin".to_string(),
+                                            "Unknown array builtin".to_string(),
                                             current_line,
-                                        ))
+                                        ));
                                     }
+                                }
+                                ReferenceType::External(ref mut e) => {
+                                    let arity = e.get_arity(&builtin);
+                                    let mut args = Vec::new();
+                                    for _ in 0..arity {
+                                        // Hack: copied pop
+
+                                        args.push(self.stack.pop(current_line)?)
+                                    }
+                                    let rt = e.call(&builtin, args);
+                                    if let ReferenceType::Nil = rt {
+                                        self.stack.push(Value::Nil);
+                                    } else {
+                                        new_ref_type = Some(rt);
+                                    }
+                                }
+                                _ => {
+                                    return Err(InterpreterError::RuntimeError(
+                                        "Unknown builtin".to_string(),
+                                        current_line,
+                                    ))
                                 }
                             }
-                            match to_push {
-                                ValueOrRef::Value(v) => self.stack.push(v),
-                                ValueOrRef::Ref(r) => {
-                                    let id = self.new_reference_type(r);
-                                    self.stack.push(Value::ReferenceId(id));
-                                }
+                            if let Some(rt) = new_ref_type {
+                                let id = self.new_reference_type(rt);
+                                self.stack.push(Value::ReferenceId(id));
                             }
                         }
 

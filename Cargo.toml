@@ -3,6 +3,7 @@ name = "notlox"
 version = "0.1.0"
 authors = ["Max Hunt <max@huntw3.com>"]
 autobins = false
+edition = "2018"
 
 [dependencies]
 num = "0.2"

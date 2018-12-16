@@ -77,13 +77,15 @@ impl Ord for HashableValue {
             },
             HashableValue::Boolean(b) => match other {
                 HashableValue::Nil | HashableValue::Number(_) => Ordering::Greater,
-                HashableValue::Boolean(b2) => if *b == *b2 {
-                    Ordering::Equal
-                } else if *b && !*b2 {
-                    Ordering::Greater
-                } else {
-                    Ordering::Less
-                },
+                HashableValue::Boolean(b2) => {
+                    if *b == *b2 {
+                        Ordering::Equal
+                    } else if *b && !*b2 {
+                        Ordering::Greater
+                    } else {
+                        Ordering::Less
+                    }
+                }
                 _ => Ordering::Less,
             },
             HashableValue::String(s) => match other {
