@@ -677,14 +677,6 @@ impl VM {
                     self.stack.push(Value::Boolean(value.is_falsey()));
                 }
 
-                Some(chunk::OpCode::And) => {
-                    println!("!!! VM Warning: Deprecated OpCode::And !!!");
-                    let a = self.stack.pop(current_line)?;
-                    let b = self.stack.pop(current_line)?;
-                    self.stack
-                        .push(Value::Boolean(!a.is_falsey() && !b.is_falsey()));
-                }
-
                 Some(chunk::OpCode::Dup) => {
                     let val = self.stack.peek();
                     self.stack.push(val);
