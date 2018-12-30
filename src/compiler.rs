@@ -1,12 +1,13 @@
 use super::{
-    chunk, chunk::OpCode, debug, errors::Result, parser, scanner, scanner::TokenType, value,
+    chunk, chunk::OpCode, debug, errors::NotloxError::CompilerError, errors::Result, parser,
+    scanner, scanner::TokenType, value,
 };
 use std::collections::HashMap;
 
 pub fn compile(source: &str) -> Result<chunk::Chunk> {
     let ast = parser::parse(source)?;
     let mut compiler = Compiler::new();
-    compiler.compile_program(ast);
+    compiler.compile_program(ast)?;
     debug::disassemble_chunk(&compiler.chunk, "foo.nlx");
     Ok(compiler.chunk)
 }
@@ -100,18 +101,19 @@ impl Compiler {
         return None;
     }
 
-    fn compile_program(&mut self, program: parser::Program) {
+    fn compile_program(&mut self, program: parser::Program) -> Result<()> {
         for d in program.statements {
-            self.compile_statement(d, true);
+            self.compile_statement(d, true)?;
         }
 
-        while self.deferred.len() > 0 {
-            let fn_statement = self.deferred.pop().unwrap();
-            self.compile_fn_statement(fn_statement, true);
+        while let Some(fn_statement) = self.deferred.pop() {
+            self.compile_fn_statement(fn_statement, true)?;
         }
+
+        return Ok(());
     }
 
-    fn compile_statement(&mut self, statement: parser::Statement, top_level: bool) {
+    fn compile_statement(&mut self, statement: parser::Statement, top_level: bool) -> Result<()> {
         match statement {
             parser::Statement::LetStatement(v) => self.compile_let_statement(v),
             parser::Statement::PrintStatement(p) => self.compile_print_statement(p),
@@ -128,40 +130,57 @@ impl Compiler {
         current_env.next_local - 1
     }
 
-    fn compile_let_statement(&mut self, let_statement: parser::LetStatement) {
+    fn compile_let_statement(&mut self, let_statement: parser::LetStatement) -> Result<()> {
         let parser::LetStatement {
             name,
             line,
             initializer,
         } = let_statement;
-        let opt = initializer.map(|expression| {
-            self.compile_expression(expression);
-        });
+        let mut need_to_assign = false;
+        if let Some(expression) = initializer {
+            self.compile_expression(expression)?;
+            need_to_assign = true;
+        }
         let local_number = self.bind_local(name);
-        opt.map(|_| {
+        if need_to_assign {
             self.chunk.write_chunk(OpCode::AssignLocal as u8, line);
             self.chunk.write_chunk(local_number, line);
             self.adjust_stack_usage(-1);
-        });
+        }
+
+        return Ok(());
     }
 
-    fn compile_print_statement(&mut self, statement: parser::PrintStatement) {
-        self.compile_expression(statement.value);
+    fn compile_print_statement(&mut self, statement: parser::PrintStatement) -> Result<()> {
+        self.compile_expression(statement.value)?;
         self.chunk.write_chunk(OpCode::Print as u8, statement.line);
         self.adjust_stack_usage(-1);
+
+        return Ok(());
     }
 
-    fn compile_expression_statement(&mut self, statement: parser::ExpressionStatement) {
-        self.compile_expression(statement.expression);
+    fn compile_expression_statement(
+        &mut self,
+        statement: parser::ExpressionStatement,
+    ) -> Result<()> {
+        self.compile_expression(statement.expression)?;
         self.chunk.write_chunk(OpCode::Pop as u8, statement.line);
         self.adjust_stack_usage(-1);
+
+        return Ok(());
     }
 
-    fn compile_fn_statement(&mut self, fn_statement: parser::FnStatement, top_level: bool) {
+    fn compile_fn_statement(
+        &mut self,
+        fn_statement: parser::FnStatement,
+        top_level: bool,
+    ) -> Result<()> {
         self.chunk
             .register_function(fn_statement.name.clone(), fn_statement.args.len() as u8);
         if !top_level {
             self.deferred.push(fn_statement);
+
+            return Ok(());
         } else {
             self.max_local = 0;
             self.pushed_this_fn = 0;
@@ -174,14 +193,16 @@ impl Compiler {
                     .write_chunk(OpCode::AssignLocal as u8, fn_statement.line);
                 self.chunk.write_chunk(local_number, fn_statement.line);
             }
-            self.compile_block(fn_statement.block);
+            self.compile_block(fn_statement.block)?;
             self.chunk
                 .write_chunk(OpCode::Return as u8, fn_statement.line);
             self.chunk.code[locals_addr] = self.max_local;
+
+            return Ok(());
         }
     }
 
-    fn compile_expression(&mut self, expression: parser::Expression) {
+    fn compile_expression(&mut self, expression: parser::Expression) -> Result<()> {
         match expression {
             parser::Expression::Literal(l) => self.compile_literal(l),
             parser::Expression::Unary(u) => self.compile_unary(u),
@@ -207,7 +228,7 @@ impl Compiler {
         }
     }
 
-    fn compile_literal(&mut self, literal: parser::Literal) {
+    fn compile_literal(&mut self, literal: parser::Literal) -> Result<()> {
         match literal {
             parser::Literal::Number(n, line) => {
                 let c = self.chunk.add_constant(value::Value::Number(n));
@@ -242,25 +263,29 @@ impl Compiler {
                 self.adjust_stack_usage(1);
             }
         }
+
+        return Ok(());
     }
 
-    fn compile_unary(&mut self, unary: parser::Unary) {
-        self.compile_expression(*unary.expression);
+    fn compile_unary(&mut self, unary: parser::Unary) -> Result<()> {
+        self.compile_expression(*unary.expression)?;
         match unary.operator.token_type {
             TokenType::Minus => self.chunk.write_chunk(OpCode::Negate as u8, unary.line),
             TokenType::Bang => self.chunk.write_chunk(OpCode::Not as u8, unary.line),
             _ => panic!("Unimplemented unary operator"),
         }
+
+        return Ok(());
     }
 
-    fn compile_binary(&mut self, binary: parser::Binary) {
+    fn compile_binary(&mut self, binary: parser::Binary) -> Result<()> {
         if binary.operator.token_type == TokenType::AmpersandAmpersand {
-            self.compile_and(binary);
+            self.compile_and(binary)?;
         } else if binary.operator.token_type == TokenType::PipePipe {
-            self.compile_or(binary);
+            self.compile_or(binary)?;
         } else {
-            self.compile_expression(*binary.right);
-            self.compile_expression(*binary.left);
+            self.compile_expression(*binary.right)?;
+            self.compile_expression(*binary.left)?;
             match binary.operator.token_type {
                 TokenType::Plus => self.chunk.write_chunk(OpCode::Add as u8, binary.line),
                 TokenType::Minus => self.chunk.write_chunk(OpCode::Subtract as u8, binary.line),
@@ -287,10 +312,12 @@ impl Compiler {
             }
             self.adjust_stack_usage(-1);
         }
+
+        return Ok(());
     }
 
-    fn compile_and(&mut self, binary: parser::Binary) {
-        self.compile_expression(*binary.left);
+    fn compile_and(&mut self, binary: parser::Binary) -> Result<()> {
+        self.compile_expression(*binary.left)?;
         self.chunk.write_chunk(OpCode::Dup as u8, binary.line);
         self.adjust_stack_usage(1);
         self.chunk
@@ -301,13 +328,15 @@ impl Compiler {
         self.adjust_stack_usage(-1);
         self.chunk.write_chunk(OpCode::Pop as u8, binary.line);
         self.adjust_stack_usage(-1);
-        self.compile_expression(*binary.right);
+        self.compile_expression(*binary.right)?;
         let jump_target = self.chunk.code.len();
         self.insert_jump_address(jump_address, jump_target);
+
+        return Ok(());
     }
 
-    fn compile_or(&mut self, binary: parser::Binary) {
-        self.compile_expression(*binary.left);
+    fn compile_or(&mut self, binary: parser::Binary) -> Result<()> {
+        self.compile_expression(*binary.left)?;
         self.chunk.write_chunk(OpCode::Dup as u8, binary.line);
         self.adjust_stack_usage(1);
         self.chunk
@@ -318,52 +347,69 @@ impl Compiler {
         self.adjust_stack_usage(-1);
         self.chunk.write_chunk(OpCode::Pop as u8, binary.line);
         self.adjust_stack_usage(-1);
-        self.compile_expression(*binary.right);
+        self.compile_expression(*binary.right)?;
         let jump_target = self.chunk.code.len();
         self.insert_jump_address(jump_address, jump_target);
+
+        return Ok(());
     }
 
-    fn compile_grouping(&mut self, grouping: parser::Grouping) {
-        self.compile_expression(*grouping.expression);
+    fn compile_grouping(&mut self, grouping: parser::Grouping) -> Result<()> {
+        self.compile_expression(*grouping.expression)
     }
 
-    fn compile_variable(&mut self, variable: parser::Variable) {
-        let number = self.find_local(&variable.name).unwrap();
-        self.chunk
-            .write_chunk(OpCode::LoadLocal as u8, variable.line);
-        self.chunk.write_chunk(number, variable.line);
-        self.adjust_stack_usage(1);
+    fn compile_variable(&mut self, variable: parser::Variable) -> Result<()> {
+        if let Some(number) = self.find_local(&variable.name) {
+            self.chunk
+                .write_chunk(OpCode::LoadLocal as u8, variable.line);
+            self.chunk.write_chunk(number, variable.line);
+            self.adjust_stack_usage(1);
+
+            return Ok(());
+        } else {
+            return Err(CompilerError(format!(
+                "Undefined variable: {}",
+                variable.name
+            )));
+        }
     }
 
-    fn compile_block(&mut self, block: parser::Block) {
+    fn compile_block(&mut self, block: parser::Block) -> Result<()> {
         self.push_environment();
         for s in block.statements {
-            self.compile_statement(s, false);
+            self.compile_statement(s, false)?;
         }
         match block.expression {
-            Some(e) => self.compile_expression(*e),
+            Some(e) => self.compile_expression(*e)?,
             None => {
                 self.chunk.write_chunk(OpCode::PushNil as u8, block.line);
                 self.adjust_stack_usage(1);
             }
         }
         self.pop_environment();
+
+        return Ok(());
     }
 
-    fn compile_call(&mut self, call: parser::Call) {
+    fn compile_call(&mut self, call: parser::Call) -> Result<()> {
         let nargs = call.args.len() as u8;
         for e in call.args {
-            self.compile_expression(e);
+            self.compile_expression(e)?;
         }
         self.chunk.write_chunk(OpCode::Call as u8, call.line);
         if let parser::Expression::Variable(v) = *call.callee {
-            let fn_number = *self.chunk.function_names.get(&v.name).unwrap();
-            self.chunk.write_chunk(fn_number, call.line);
+            if let Some(fn_number) = self.chunk.function_names.get(&v.name) {
+                self.chunk.write_chunk(*fn_number, call.line);
+            } else {
+                return Err(CompilerError(format!("Undefined function: {}", v.name)));
+            }
         } else {
-            panic!("Expected variable in call");
+            return Err(CompilerError("Expected variable in call".to_string()));
         }
         self.adjust_stack_usage(-(nargs as i8));
         self.adjust_stack_usage(1);
+
+        return Ok(());
     }
 
     fn insert_jump_address(&mut self, jump_target_address: usize, dest_address: usize) {
@@ -372,15 +418,15 @@ impl Compiler {
         self.chunk.code[jump_target_address + 1] = (addr >> 8) as u8;
     }
 
-    fn compile_if(&mut self, if_expression: parser::If) {
-        self.compile_expression(*if_expression.condition);
+    fn compile_if(&mut self, if_expression: parser::If) -> Result<()> {
+        self.compile_expression(*if_expression.condition)?;
         self.chunk
             .write_chunk(OpCode::JumpIfFalse as u8, if_expression.line);
         self.chunk.write_chunk(0, if_expression.line);
         self.chunk.write_chunk(0, if_expression.line);
         self.adjust_stack_usage(-1);
         let jump_target_address = self.chunk.code.len() - 2;
-        self.compile_block(if_expression.then_block);
+        self.compile_block(if_expression.then_block)?;
         self.chunk
             .write_chunk(OpCode::Jump as u8, if_expression.line);
         self.chunk.write_chunk(0, if_expression.line);
@@ -390,7 +436,7 @@ impl Compiler {
         self.insert_jump_address(jump_target_address, addr);
         self.adjust_stack_usage(-1);
         match if_expression.else_expression {
-            Some(e) => self.compile_expression(*e),
+            Some(e) => self.compile_expression(*e)?,
             None => {
                 self.chunk
                     .write_chunk(OpCode::PushNil as u8, if_expression.line);
@@ -399,11 +445,13 @@ impl Compiler {
         }
         let addr = self.chunk.code.len();
         self.insert_jump_address(else_target_address, addr);
+
+        return Ok(());
     }
 
-    fn compile_while(&mut self, while_expression: parser::While) {
+    fn compile_while(&mut self, while_expression: parser::While) -> Result<()> {
         let while_start_address = self.chunk.code.len();
-        self.compile_expression(*while_expression.condition);
+        self.compile_expression(*while_expression.condition)?;
         self.chunk
             .write_chunk(OpCode::JumpIfFalse as u8, while_expression.line);
         self.chunk.write_chunk(0, while_expression.line);
@@ -411,7 +459,7 @@ impl Compiler {
         self.adjust_stack_usage(-1);
         self.push_loop_context(while_start_address, false);
         let jump_target_address = self.chunk.code.len() - 2;
-        self.compile_block(while_expression.block);
+        self.compile_block(while_expression.block)?;
         self.chunk
             .write_chunk(OpCode::Pop as u8, while_expression.line);
         self.adjust_stack_usage(-1);
@@ -426,10 +474,12 @@ impl Compiler {
         self.chunk
             .write_chunk(OpCode::PushNil as u8, while_expression.line);
         self.adjust_stack_usage(1);
+
+        return Ok(());
     }
 
-    fn compile_for(&mut self, for_expression: parser::For) {
-        self.compile_expression(*for_expression.range);
+    fn compile_for(&mut self, for_expression: parser::For) -> Result<()> {
+        self.compile_expression(*for_expression.range)?;
         let for_local_n = self.bind_local("_for_loop_range".to_string());
         self.chunk
             .write_chunk(OpCode::AssignLocal as u8, for_expression.line);
@@ -463,7 +513,7 @@ impl Compiler {
             self.chunk.write_chunk(local2_n as u8, for_expression.line);
         }
 
-        self.compile_block(for_expression.block);
+        self.compile_block(for_expression.block)?;
         self.chunk
             .write_chunk(OpCode::Pop as u8, for_expression.line);
         self.adjust_stack_usage(-1);
@@ -477,12 +527,14 @@ impl Compiler {
         self.chunk
             .write_chunk(OpCode::PushNil as u8, for_expression.line);
         self.pop_loop_context(current_address);
+
+        return Ok(());
     }
 
-    fn compile_loop(&mut self, loop_expression: parser::Loop) {
+    fn compile_loop(&mut self, loop_expression: parser::Loop) -> Result<()> {
         let loop_start_address = self.chunk.code.len();
         self.push_loop_context(loop_start_address, false);
-        self.compile_block(loop_expression.block);
+        self.compile_block(loop_expression.block)?;
         self.chunk
             .write_chunk(OpCode::Pop as u8, loop_expression.line);
         self.adjust_stack_usage(-1);
@@ -496,22 +548,30 @@ impl Compiler {
         self.chunk
             .write_chunk(OpCode::PushNil as u8, loop_expression.line);
         self.adjust_stack_usage(1);
+
+        return Ok(());
     }
 
-    fn compile_assignment(&mut self, assignment: parser::Assignment) {
+    fn compile_assignment(&mut self, assignment: parser::Assignment) -> Result<()> {
         match assignment.lvalue {
             parser::LValue::Variable(v) => {
-                self.compile_expression(*assignment.value);
+                self.compile_expression(*assignment.value)?;
                 self.chunk
                     .write_chunk(OpCode::AssignLocal as u8, assignment.line);
-                let local_number = self.find_local(&v.name).unwrap();
-                self.chunk.write_chunk(local_number, assignment.line);
-                self.adjust_stack_usage(-1);
+                if let Some(local_number) = self.find_local(&v.name) {
+                    self.chunk.write_chunk(local_number, assignment.line);
+                    self.adjust_stack_usage(-1);
+                } else {
+                    return Err(CompilerError(format!(
+                        "Assignment to undefined local: {}",
+                        v.name
+                    )));
+                }
             }
             parser::LValue::Index(i) => {
-                self.compile_expression(*i.indexer);
-                self.compile_expression(*i.value);
-                self.compile_expression(*assignment.value);
+                self.compile_expression(*i.indexer)?;
+                self.compile_expression(*i.value)?;
+                self.compile_expression(*assignment.value)?;
                 self.chunk
                     .write_chunk(OpCode::IndexAssign as u8, assignment.line);
                 self.adjust_stack_usage(-3);
@@ -520,9 +580,14 @@ impl Compiler {
         self.chunk
             .write_chunk(OpCode::PushNil as u8, assignment.line);
         self.adjust_stack_usage(1);
+
+        return Ok(());
     }
 
-    fn compile_compound_assignment(&mut self, compound_assignment: parser::CompoundAssignment) {
+    fn compile_compound_assignment(
+        &mut self,
+        compound_assignment: parser::CompoundAssignment,
+    ) -> Result<()> {
         let op = scanner::Token {
             token_type: match compound_assignment.operator {
                 TokenType::MinusEqual => TokenType::Minus,
@@ -548,27 +613,33 @@ impl Compiler {
                 line: compound_assignment.line,
             })),
             line: compound_assignment.line,
-        });
+        })?;
+
+        return Ok(());
     }
 
-    fn compile_index(&mut self, index: parser::Index) {
-        self.compile_expression(*index.indexer);
-        self.compile_expression(*index.value);
+    fn compile_index(&mut self, index: parser::Index) -> Result<()> {
+        self.compile_expression(*index.indexer)?;
+        self.compile_expression(*index.value)?;
         self.chunk.write_chunk(OpCode::Index as u8, index.line);
         self.adjust_stack_usage(-1);
+
+        return Ok(());
     }
 
-    fn compile_array(&mut self, array: parser::Array) {
+    fn compile_array(&mut self, array: parser::Array) -> Result<()> {
         self.chunk.write_chunk(OpCode::NewArray as u8, array.line);
         self.adjust_stack_usage(1);
         for e in array.initializers {
-            self.compile_expression(e);
+            self.compile_expression(e)?;
             self.chunk.write_chunk(OpCode::PushArray as u8, array.line);
             self.adjust_stack_usage(-1);
         }
+
+        return Ok(());
     }
 
-    fn compile_map(&mut self, map: parser::Map) {
+    fn compile_map(&mut self, map: parser::Map) -> Result<()> {
         self.chunk.write_chunk(OpCode::NewMap as u8, map.line);
         self.adjust_stack_usage(1);
         for i in map.initializers {
@@ -580,23 +651,25 @@ impl Compiler {
                     self.adjust_stack_usage(1);
                 }
                 parser::MapLHS::Expression(e) => {
-                    self.compile_expression(e);
+                    self.compile_expression(e)?;
                 }
             }
 
-            self.compile_expression(*i.value);
+            self.compile_expression(*i.value)?;
 
             self.chunk.write_chunk(OpCode::PushMap as u8, map.line);
             self.adjust_stack_usage(-2);
         }
+
+        return Ok(());
     }
 
-    fn compile_builtin_call(&mut self, builtin_call: parser::BuiltinCall) {
+    fn compile_builtin_call(&mut self, builtin_call: parser::BuiltinCall) -> Result<()> {
         let nargs = builtin_call.args.len() as u8;
         for e in builtin_call.args {
-            self.compile_expression(e);
+            self.compile_expression(e)?;
         }
-        self.compile_expression(*builtin_call.callee);
+        self.compile_expression(*builtin_call.callee)?;
         let c = self
             .chunk
             .add_constant(value::Value::String(builtin_call.name));
@@ -608,16 +681,20 @@ impl Compiler {
             .write_chunk(OpCode::BuiltinCall as u8, builtin_call.line);
         self.adjust_stack_usage(-2 - (nargs as i8));
         self.adjust_stack_usage(1);
+
+        return Ok(());
     }
 
-    fn compile_range(&mut self, range: parser::Range) {
-        self.compile_expression(*range.left);
-        self.compile_expression(*range.right);
+    fn compile_range(&mut self, range: parser::Range) -> Result<()> {
+        self.compile_expression(*range.left)?;
+        self.compile_expression(*range.right)?;
         self.chunk.write_chunk(OpCode::MakeRange as u8, range.line);
         self.adjust_stack_usage(-1);
+
+        return Ok(());
     }
 
-    fn compile_return(&mut self, return_expression: parser::Return) {
+    fn compile_return(&mut self, return_expression: parser::Return) -> Result<()> {
         if self.pushed_this_fn > 0 {
             self.chunk
                 .write_chunk(OpCode::PopMulti as u8, return_expression.line);
@@ -625,7 +702,7 @@ impl Compiler {
                 .write_chunk(self.pushed_this_fn, return_expression.line);
         }
         match return_expression.value {
-            Some(e) => self.compile_expression(*e),
+            Some(e) => self.compile_expression(*e)?,
             None => {
                 self.chunk
                     .write_chunk(OpCode::PushNil as u8, return_expression.line);
@@ -635,41 +712,48 @@ impl Compiler {
         self.chunk
             .write_chunk(OpCode::Return as u8, return_expression.line);
         self.adjust_stack_usage(1); // Logically this should be an expression returning a value, but it doesn't return.
+
+        return Ok(());
     }
 
-    fn compile_continue(&mut self, line: usize) {
-        if self.loop_contexts.last().unwrap().pushed_this_loop > 0 {
-            self.chunk.write_chunk(OpCode::PopMulti as u8, line);
-            self.chunk
-                .write_chunk(self.loop_contexts.last().unwrap().pushed_this_loop, line);
+    fn compile_continue(&mut self, line: usize) -> Result<()> {
+        if let Some(loop_context) = self.loop_contexts.last() {
+            if loop_context.pushed_this_loop > 0 {
+                self.chunk.write_chunk(OpCode::PopMulti as u8, line);
+                self.chunk.write_chunk(loop_context.pushed_this_loop, line);
+            }
+            self.chunk.write_chunk(OpCode::Jump as u8, line);
+            self.chunk.write_chunk(0, line);
+            self.chunk.write_chunk(0, line);
+            let jump_target_address = self.chunk.code.len() - 2;
+            let continue_address = loop_context.continue_address;
+            self.insert_jump_address(jump_target_address, continue_address);
+            self.adjust_stack_usage(1); // Logically this should be an expression returning a value, but it doesn't return.
+
+            return Ok(());
+        } else {
+            return Err(CompilerError("Continue outside of loop.".to_string()));
         }
-        self.chunk.write_chunk(OpCode::Jump as u8, line);
-        self.chunk.write_chunk(0, line);
-        self.chunk.write_chunk(0, line);
-        let jump_target_address = self.chunk.code.len() - 2;
-        let continue_address = self.loop_contexts.last().unwrap().continue_address;
-        self.insert_jump_address(jump_target_address, continue_address);
-        self.adjust_stack_usage(1); // Logically this should be an expression returning a value, but it doesn't return.
     }
 
-    fn compile_break(&mut self, line: usize) {
-        if self.loop_contexts.last().unwrap().pushed_this_loop > 0 {
-            self.chunk.write_chunk(OpCode::PopMulti as u8, line);
-            self.chunk
-                .write_chunk(self.loop_contexts.last().unwrap().pushed_this_loop, line);
-            self.loop_contexts.last_mut().unwrap().pushed_this_loop = 0;
+    fn compile_break(&mut self, line: usize) -> Result<()> {
+        if let Some(loop_context) = self.loop_contexts.last_mut() {
+            if loop_context.pushed_this_loop > 0 {
+                self.chunk.write_chunk(OpCode::PopMulti as u8, line);
+                self.chunk.write_chunk(loop_context.pushed_this_loop, line);
+            }
+            if loop_context.break_pop {
+                self.chunk.write_chunk(OpCode::Pop as u8, line);
+            }
+            self.chunk.write_chunk(OpCode::Jump as u8, line);
+            self.chunk.write_chunk(0, line);
+            self.chunk.write_chunk(0, line);
+            loop_context.breaks.push(self.chunk.code.len() - 2);
+            self.adjust_stack_usage(1); // Logically this should be an expression returning a value, but it doesn't return.
+
+            return Ok(());
+        } else {
+            return Err(CompilerError("Break outside of loop.".to_string()));
         }
-        if self.loop_contexts.last().unwrap().break_pop {
-            self.chunk.write_chunk(OpCode::Pop as u8, line);
-        }
-        self.chunk.write_chunk(OpCode::Jump as u8, line);
-        self.chunk.write_chunk(0, line);
-        self.chunk.write_chunk(0, line);
-        self.loop_contexts
-            .last_mut()
-            .unwrap()
-            .breaks
-            .push(self.chunk.code.len() - 2);
-        self.adjust_stack_usage(1); // Logically this should be an expression returning a value, but it doesn't return.
     }
 }
