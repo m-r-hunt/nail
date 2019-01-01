@@ -1,0 +1,14 @@
+let foo = 3;
+
+fn do_foo() {
+   print "doing foo";
+   foo = 5;
+}
+
+fn main() {
+   print foo;
+   foo = 4;
+   print foo;
+   do_foo();
+   print foo;
+}

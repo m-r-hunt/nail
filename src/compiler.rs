@@ -115,7 +115,7 @@ impl Compiler {
 
     fn compile_statement(&mut self, statement: parser::Statement, top_level: bool) -> Result<()> {
         match statement {
-            parser::Statement::LetStatement(v) => self.compile_let_statement(v),
+            parser::Statement::LetStatement(v) => self.compile_let_statement(v, top_level),
             parser::Statement::PrintStatement(p) => self.compile_print_statement(p),
             parser::Statement::ExpressionStatement(e) => self.compile_expression_statement(e),
             parser::Statement::FnStatement(f) => self.compile_fn_statement(f, top_level),
@@ -130,22 +130,61 @@ impl Compiler {
         current_env.next_local - 1
     }
 
-    fn compile_let_statement(&mut self, let_statement: parser::LetStatement) -> Result<()> {
+    fn evaluate(&mut self, expression: parser::Expression) -> Result<value::Value> {
+        match expression {
+            parser::Expression::Literal(parser::Literal::Number(n, _)) => {
+                Ok(value::Value::Number(n))
+            }
+            parser::Expression::Literal(parser::Literal::String(s, _)) => {
+                Ok(value::Value::String(s))
+            }
+            parser::Expression::Literal(parser::Literal::Char(c, _)) => {
+                Ok(value::Value::Number(c as u64 as f64))
+            }
+            parser::Expression::Literal(parser::Literal::False(_)) => {
+                Ok(value::Value::Boolean(false))
+            }
+            parser::Expression::Literal(parser::Literal::True(_)) => {
+                Ok(value::Value::Boolean(true))
+            }
+            parser::Expression::Literal(parser::Literal::Nil(_)) => Ok(value::Value::Nil),
+            _ => {
+                return Err(CompilerError(
+                    "Expected literal in global let initializer.".to_string(),
+                ))
+            }
+        }
+    }
+
+    fn compile_let_statement(
+        &mut self,
+        let_statement: parser::LetStatement,
+        top_level: bool,
+    ) -> Result<()> {
         let parser::LetStatement {
             name,
             line,
             initializer,
         } = let_statement;
-        let mut need_to_assign = false;
-        if let Some(expression) = initializer {
-            self.compile_expression(expression)?;
-            need_to_assign = true;
-        }
-        let local_number = self.bind_local(name);
-        if need_to_assign {
-            self.chunk.write_chunk(OpCode::AssignLocal as u8, line);
-            self.chunk.write_chunk(local_number, line);
-            self.adjust_stack_usage(-1);
+        if top_level {
+            let value = if let Some(expression) = initializer {
+                self.evaluate(expression)?
+            } else {
+                value::Value::Nil
+            };
+            self.chunk.register_global(&name, value);
+        } else {
+            let mut need_to_assign = false;
+            if let Some(expression) = initializer {
+                self.compile_expression(expression)?;
+                need_to_assign = true;
+            }
+            let local_number = self.bind_local(name);
+            if need_to_assign {
+                self.chunk.write_chunk(OpCode::AssignLocal as u8, line);
+                self.chunk.write_chunk(local_number, line);
+                self.adjust_stack_usage(-1);
+            }
         }
 
         return Ok(());
@@ -366,6 +405,15 @@ impl Compiler {
             self.adjust_stack_usage(1);
 
             return Ok(());
+        } else if self.chunk.check_global(&variable.name) {
+            let c = self.chunk.add_constant(value::Value::String(variable.name));
+            self.chunk
+                .write_chunk(OpCode::Constant as u8, variable.line);
+            self.chunk.write_chunk(c, variable.line);
+            self.chunk
+                .write_chunk(OpCode::LoadGlobal as u8, variable.line);
+
+            return Ok(());
         } else {
             return Err(CompilerError(format!(
                 "Undefined variable: {}",
@@ -556,11 +604,18 @@ impl Compiler {
         match assignment.lvalue {
             parser::LValue::Variable(v) => {
                 self.compile_expression(*assignment.value)?;
-                self.chunk
-                    .write_chunk(OpCode::AssignLocal as u8, assignment.line);
                 if let Some(local_number) = self.find_local(&v.name) {
+                    self.chunk
+                        .write_chunk(OpCode::AssignLocal as u8, assignment.line);
                     self.chunk.write_chunk(local_number, assignment.line);
                     self.adjust_stack_usage(-1);
+                } else if self.chunk.check_global(&v.name) {
+                    let c = self.chunk.add_constant(value::Value::String(v.name));
+                    self.chunk
+                        .write_chunk(OpCode::Constant as u8, assignment.line);
+                    self.chunk.write_chunk(c, assignment.line);
+                    self.chunk
+                        .write_chunk(OpCode::AssignGlobal as u8, assignment.line);
                 } else {
                     return Err(CompilerError(format!(
                         "Assignment to undefined local: {}",

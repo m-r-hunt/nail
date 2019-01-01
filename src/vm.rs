@@ -690,6 +690,34 @@ impl VM {
                     }
                 }
 
+                Some(chunk::OpCode::AssignGlobal) => {
+                    let global = self.stack.pop(current_line)?;
+                    let value = self.stack.pop(current_line)?;
+                    if let Value::String(global_name) = global {
+                        self.chunk.globals.insert(global_name, value);
+                    } else {
+                        return runtime_error(
+                            "Expected name string for Assign Global.",
+                            current_line,
+                        );
+                    }
+                }
+
+                Some(chunk::OpCode::LoadGlobal) => {
+                    let global = self.stack.pop(current_line)?;
+                    if let Value::String(global_name) = global {
+                        self.stack.push(
+                            self.chunk
+                                .globals
+                                .get(&global_name)
+                                .unwrap_or(&Value::Nil)
+                                .clone(),
+                        );
+                    } else {
+                        return runtime_error("Expected name string for Load Global.", current_line);
+                    }
+                }
+
                 None => return runtime_error("Bad instruction", current_line),
             }
         }

@@ -1,4 +1,5 @@
 use super::value::Value;
+use std::collections::HashMap;
 
 #[derive(Copy, Clone)]
 #[repr(u8)]
@@ -62,6 +63,9 @@ pub enum OpCode {
 
     Dup = 38,
     JumpIfTrue = 39,
+
+    AssignGlobal = 40,
+    LoadGlobal = 41,
 }
 
 impl OpCode {
@@ -128,6 +132,9 @@ impl OpCode {
 
             39 => Some(OpCode::JumpIfTrue),
 
+            40 => Some(OpCode::AssignGlobal),
+            41 => Some(OpCode::LoadGlobal),
+
             _ => None,
         }
     }
@@ -138,6 +145,7 @@ pub struct Chunk {
     pub code: Vec<u8>,
     pub lines: Vec<usize>,
     pub constants: Vec<Value>,
+    pub globals: HashMap<String, Value>,
     pub function_names: std::collections::HashMap<String, u8>,
     pub function_locations: Vec<usize>,
 }
@@ -182,5 +190,17 @@ impl Chunk {
     pub fn lookup_function(&self, name: &str) -> usize {
         let number = self.function_names.get(name).unwrap();
         return self.function_locations[*number as usize];
+    }
+
+    pub fn register_global(&mut self, name: &str, value: Value) {
+        self.globals.insert(name.to_string(), value);
+    }
+
+    pub fn check_global(&mut self, name: &str) -> bool {
+        self.globals.get(name).is_some()
+    }
+
+    pub fn assign_global(&mut self, name: &str, value: Value) {
+        self.globals.insert(name.to_string(), value);
     }
 }

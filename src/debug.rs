@@ -82,6 +82,9 @@ pub fn disassemble_instruction(chunk: &Chunk, offset: usize) -> usize {
 
         Some(OpCode::JumpIfTrue) => signed_number_16_instruction("OP_JUMP_IF_TRUE", &chunk, offset),
 
+        Some(OpCode::AssignGlobal) => simple_instruction("OP_ASSIGN_GLOBAL", offset),
+        Some(OpCode::LoadGlobal) => simple_instruction("OP_LOAD_GLOBAL", offset),
+
         None => {
             println!("Unknown opcode {}", instr);
             offset + 1
