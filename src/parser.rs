@@ -229,7 +229,7 @@ pub struct Program {
 }
 
 impl Parser {
-    fn new(source: &str) -> Result<Self> {
+    fn try_new(source: &str) -> Result<Self> {
         let mut scanner = scanner::Scanner::new(source);
         let first = scanner.scan_token()?;
         Ok(Self {
@@ -250,35 +250,36 @@ impl Parser {
             return self.fn_statement();
         }
 
-        return self.expression_statement();
+        self.expression_statement()
     }
 
     fn let_statement(&mut self) -> Result<Statement> {
         let line = self.previous().line;
         let name = self.consume(TokenType::Identifier, "Expect variable name.")?;
 
-        let mut initializer = None;
-        if self.matches(&[TokenType::Equal])? {
-            initializer = Some(self.expression()?);
-        }
+        let initializer = if self.matches(&[TokenType::Equal])? {
+            Some(self.expression()?)
+        } else {
+            None
+        };
 
         self.consume(
             TokenType::Semicolon,
             "Expect ';' after variable declaration.",
         )?;
         let name = self.scanner.get_lexeme(&name);
-        return Ok(Statement::LetStatement(LetStatement {
+        Ok(Statement::LetStatement(LetStatement {
             name,
             initializer,
             line,
-        }));
+        }))
     }
 
     fn print_statement(&mut self) -> Result<Statement> {
         let line = self.previous().line;
         let value = self.expression()?;
         self.consume(TokenType::Semicolon, "Expect ';' after value.")?;
-        return Ok(Statement::PrintStatement(PrintStatement { value, line }));
+        Ok(Statement::PrintStatement(PrintStatement { value, line }))
     }
 
     fn fn_statement(&mut self) -> Result<Statement> {
@@ -303,25 +304,25 @@ impl Parser {
 
         let block = self.block()?;
 
-        return Ok(Statement::FnStatement(FnStatement {
+        Ok(Statement::FnStatement(FnStatement {
             name,
             args,
             block,
             line,
-        }));
+        }))
     }
 
     fn expression_statement(&mut self) -> Result<Statement> {
         let expression = self.expression()?;
         self.consume(TokenType::Semicolon, "Expect ';' after value.")?;
-        return Ok(Statement::ExpressionStatement(ExpressionStatement {
+        Ok(Statement::ExpressionStatement(ExpressionStatement {
             expression,
             line: self.previous().line,
-        }));
+        }))
     }
 
     fn expression(&mut self) -> Result<Expression> {
-        return self.compound_assignment();
+        self.compound_assignment()
     }
 
     fn can_be_statement_without_semicolon(&self, expression: &Expression) -> bool {
@@ -376,11 +377,11 @@ impl Parser {
             }
         }
         self.consume(TokenType::RightBrace, "Expected '}' to end block.")?;
-        return Ok(Block {
+        Ok(Block {
             statements,
             expression,
             line,
-        });
+        })
     }
 
     fn compound_assignment(&mut self) -> Result<Expression> {
@@ -419,7 +420,7 @@ impl Parser {
                 }
             }
         }
-        return Ok(expr);
+        Ok(expr)
     }
 
     fn assignment(&mut self) -> Result<Expression> {
@@ -450,7 +451,7 @@ impl Parser {
                 }
             }
         }
-        return Ok(expr);
+        Ok(expr)
     }
 
     fn and(&mut self) -> Result<Expression> {
@@ -465,7 +466,7 @@ impl Parser {
                 line: operator.line,
             });
         }
-        return Ok(expr);
+        Ok(expr)
     }
 
     fn equality(&mut self) -> Result<Expression> {
@@ -480,7 +481,7 @@ impl Parser {
                 line: operator.line,
             });
         }
-        return Ok(expr);
+        Ok(expr)
     }
 
     fn comparison(&mut self) -> Result<Expression> {
@@ -500,7 +501,7 @@ impl Parser {
                 line: operator.line,
             });
         }
-        return Ok(expr);
+        Ok(expr)
     }
 
     fn range(&mut self) -> Result<Expression> {
@@ -515,7 +516,7 @@ impl Parser {
             });
         }
 
-        return Ok(expr);
+        Ok(expr)
     }
 
     fn addition(&mut self) -> Result<Expression> {
@@ -530,7 +531,7 @@ impl Parser {
                 line: operator.line,
             });
         }
-        return Ok(expr);
+        Ok(expr)
     }
 
     fn multiplication(&mut self) -> Result<Expression> {
@@ -545,7 +546,7 @@ impl Parser {
                 line: operator.line,
             });
         }
-        return Ok(expr);
+        Ok(expr)
     }
 
     fn unary(&mut self) -> Result<Expression> {
@@ -558,7 +559,7 @@ impl Parser {
                 line: operator.line,
             }));
         }
-        return self.unary_postfix();
+        self.unary_postfix()
     }
 
     fn unary_postfix(&mut self) -> Result<Expression> {
@@ -578,7 +579,7 @@ impl Parser {
             }
         }
 
-        return expression;
+        expression
     }
 
     fn finish_index(&mut self, indexer: Expression) -> Result<Expression> {
@@ -586,11 +587,11 @@ impl Parser {
         let value = self.expression()?;
         self.consume(TokenType::RightBracket, "Expected ']' after arguments.")?;
 
-        return Ok(Expression::Index(Index {
+        Ok(Expression::Index(Index {
             indexer: Box::new(indexer),
             value: Box::new(value),
             line,
-        }));
+        }))
     }
 
     fn finish_dot(&mut self, indexer: Expression) -> Result<Expression> {
@@ -601,11 +602,11 @@ impl Parser {
         )?;
         let name = self.scanner.get_lexeme(&name);
 
-        return Ok(Expression::Index(Index {
+        Ok(Expression::Index(Index {
             indexer: Box::new(indexer),
             value: Box::new(Expression::Literal(Literal::String(name, line))),
             line,
-        }));
+        }))
     }
 
     fn finish_call(&mut self, callee: Expression) -> Result<Expression> {
@@ -622,11 +623,11 @@ impl Parser {
 
         self.consume(TokenType::RightParen, "Expected ')' after arguments.")?;
 
-        return Ok(Expression::Call(Call {
+        Ok(Expression::Call(Call {
             callee: Box::new(callee),
             args,
             line,
-        }));
+        }))
     }
 
     fn finish_builtin_call(&mut self, callee: Expression) -> Result<Expression> {
@@ -646,12 +647,12 @@ impl Parser {
 
         self.consume(TokenType::RightParen, "Expected ')' after arguments.")?;
         let name = self.scanner.get_lexeme(&name);
-        return Ok(Expression::BuiltinCall(BuiltinCall {
+        Ok(Expression::BuiltinCall(BuiltinCall {
             callee: Box::new(callee),
             name,
             args,
             line,
-        }));
+        }))
     }
 
     fn if_expression(&mut self) -> Result<Expression> {
@@ -666,63 +667,65 @@ impl Parser {
                 else_expression = Some(Box::new(Expression::Block(self.block()?)));
             }
         }
-        return Ok(Expression::If(If {
+        Ok(Expression::If(If {
             condition,
             then_block,
             else_expression,
             line,
-        }));
+        }))
     }
 
     fn while_expression(&mut self) -> Result<Expression> {
         let line = self.previous().line;
         let condition = Box::new(self.expression()?);
         let block = self.block()?;
-        return Ok(Expression::While(While {
+        Ok(Expression::While(While {
             condition,
             block,
             line,
-        }));
+        }))
     }
 
     fn for_expression(&mut self) -> Result<Expression> {
         let line = self.previous().line;
         let variable = self.consume(TokenType::Identifier, "Expected identifier in for loop")?;
         let variable = self.scanner.get_lexeme(&variable);
-        let mut variable2 = None;
-        if self.matches(&[TokenType::Comma])? {
+        let variable2 = if self.matches(&[TokenType::Comma])? {
             let variable2t = self.consume(
                 TokenType::Identifier,
                 "Expected second identifier in for loop",
             )?;
-            variable2 = Some(self.scanner.get_lexeme(&variable2t));
-        }
+            Some(self.scanner.get_lexeme(&variable2t))
+        } else {
+            None
+        };
         self.consume(TokenType::In, "Expected 'in' in for loop.")?;
         let range = self.expression()?;
         let block = self.block()?;
-        return Ok(Expression::For(For {
+        Ok(Expression::For(For {
             variable,
             variable2,
             range: Box::new(range),
             block,
             line,
-        }));
+        }))
     }
 
     fn loop_expression(&mut self) -> Result<Expression> {
         let line = self.previous().line;
         let block = self.block()?;
-        return Ok(Expression::Loop(Loop { block, line }));
+        Ok(Expression::Loop(Loop { block, line }))
     }
 
     fn return_expression(&mut self) -> Result<Expression> {
         let line = self.previous().line;
-        let mut value = None;
         // TODO: Check how Rust works out wether a return has an expression.
-        if !(self.check(TokenType::Semicolon) || self.check(TokenType::RightBrace)) {
-            value = Some(Box::new(self.expression()?));
-        }
-        return Ok(Expression::Return(Return { value, line }));
+        let value = if !(self.check(TokenType::Semicolon) || self.check(TokenType::RightBrace)) {
+            Some(Box::new(self.expression()?))
+        } else {
+            None
+        };
+        Ok(Expression::Return(Return { value, line }))
     }
 
     fn array(&mut self) -> Result<Expression> {
@@ -741,7 +744,7 @@ impl Parser {
             }
         }
         self.consume(TokenType::RightBracket, "Expected ']' to close array.")?;
-        return Ok(Expression::Array(out));
+        Ok(Expression::Array(out))
     }
 
     fn map(&mut self) -> Result<Expression> {
@@ -795,7 +798,7 @@ impl Parser {
             }
         }
         self.consume(TokenType::RightBrace, "Expected '}' to end map expression")?;
-        return Ok(Expression::Map(out));
+        Ok(Expression::Map(out))
     }
 
     fn primary(&mut self) -> Result<Expression> {
@@ -895,10 +898,10 @@ impl Parser {
                 line,
             }));
         }
-        return Err(ParserError(
+        Err(ParserError(
             "Expect expression".to_string(),
             self.peek().line,
-        ));
+        ))
     }
 
     fn matches(&mut self, types: &[TokenType]) -> Result<bool> {
@@ -908,14 +911,14 @@ impl Parser {
                 return Ok(true);
             }
         }
-        return Ok(false);
+        Ok(false)
     }
 
     fn check(&self, token_type: TokenType) -> bool {
         if self.is_at_end() {
             return false;
         }
-        return self.peek().token_type == token_type;
+        self.peek().token_type == token_type
     }
 
     fn advance(&mut self) -> Result<scanner::Token> {
@@ -923,7 +926,7 @@ impl Parser {
             self.previous = Some(self.next);
             self.next = self.scanner.scan_token()?;
         }
-        return Ok(self.previous());
+        Ok(self.previous())
     }
 
     fn consume(&mut self, token_type: TokenType, message: &str) -> Result<scanner::Token> {
@@ -969,12 +972,12 @@ pub fn parse(source: &str) -> Result<Program> {
         }
     }
      */
-    let mut parser = Parser::new(source)?;
+    let mut parser = Parser::try_new(source)?;
     let mut statements = Vec::new();
     while !parser.is_at_end() {
         statements.push(parser.statement()?);
     }
     let out = Program { statements };
     println!("{:?}", out);
-    return Ok(out);
+    Ok(out)
 }

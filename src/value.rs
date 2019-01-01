@@ -21,27 +21,27 @@ pub struct SanitizedFloat {
 }
 
 impl SanitizedFloat {
-    fn try_from(value: &f64, line: usize) -> Result<Self, InterpreterError> {
+    fn try_from(value: f64, line: usize) -> Result<Self, InterpreterError> {
         use num::Float;
         if !value.is_finite() {
-            return Err(InterpreterError::RuntimeError(
+            Err(InterpreterError::RuntimeError(
                 "Tried to hash bad float.".to_string(),
                 line,
-            ));
+            ))
         } else {
             let (mantissa, exponent, sign) = value.integer_decode();
-            return Ok(SanitizedFloat {
+            Ok(SanitizedFloat {
                 mantissa,
                 exponent,
                 sign,
-            });
+            })
         }
     }
 
     fn to_f64(&self) -> f64 {
-        let sign_f = self.sign as f64;
+        let sign_f = f64::from(self.sign);
         let mantissa_f = self.mantissa as f64;
-        let exponent_f = 2.0_f64.powf(self.exponent as f64);
+        let exponent_f = 2.0_f64.powf(f64::from(self.exponent));
         sign_f * mantissa_f * exponent_f
     }
 }
@@ -116,13 +116,13 @@ impl HashableValue {
     pub fn try_from(value: &Value, line: usize) -> Result<Self, InterpreterError> {
         match value {
             Value::Nil => Ok(HashableValue::Nil),
-            Value::Number(f) => Ok(HashableValue::Number(SanitizedFloat::try_from(f, line)?)),
+            Value::Number(f) => Ok(HashableValue::Number(SanitizedFloat::try_from(*f, line)?)),
             Value::Boolean(b) => Ok(HashableValue::Boolean(*b)),
             Value::String(s) => Ok(HashableValue::String(s.clone())),
             Value::ReferenceId(i) => Ok(HashableValue::ReferenceId(*i)),
             Value::Range(l, r) => Ok(HashableValue::Range(
-                SanitizedFloat::try_from(l, line)?,
-                SanitizedFloat::try_from(r, line)?,
+                SanitizedFloat::try_from(*l, line)?,
+                SanitizedFloat::try_from(*r, line)?,
             )),
             Value::MapForContext(..) => Err(InterpreterError::RuntimeError(
                 "Tried to hash map for context, this should never happen.".to_string(),
@@ -191,7 +191,7 @@ pub enum ReferenceType {
 impl std::fmt::Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Value::Nil => write!(f, "{}", "nil"),
+            Value::Nil => write!(f, "nil"),
             Value::Number(n) => write!(f, "{}", n),
             Value::Boolean(b) => write!(f, "{}", b),
             Value::String(s) => write!(f, "{}", s),

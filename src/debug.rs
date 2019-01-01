@@ -94,7 +94,7 @@ pub fn disassemble_instruction(chunk: &Chunk, offset: usize) -> usize {
 
 fn simple_instruction(name: &str, offset: usize) -> usize {
     println!("{}", name);
-    return offset + 1;
+    offset + 1
 }
 
 fn constant_instruction(name: &str, chunk: &Chunk, offset: usize) -> usize {
@@ -103,13 +103,13 @@ fn constant_instruction(name: &str, chunk: &Chunk, offset: usize) -> usize {
         "{} {} '{}'",
         name, constant, chunk.constants[constant as usize]
     );
-    return offset + 2;
+    offset + 2
 }
 
 fn number_instruction(name: &str, chunk: &Chunk, offset: usize) -> usize {
     let number = chunk.code[offset + 1];
     println!("{} {}", name, number);
-    return offset + 2;
+    offset + 2
 }
 
 fn signed_number_16_instruction(name: &str, chunk: &Chunk, offset: usize) -> usize {
@@ -120,7 +120,7 @@ fn signed_number_16_instruction(name: &str, chunk: &Chunk, offset: usize) -> usi
         name,
         (number as usize | (number2 as usize) << 8) as i16
     );
-    return offset + 3;
+    offset + 3
 }
 
 fn for_instruction(chunk: &Chunk, offset: usize) -> usize {
@@ -132,5 +132,5 @@ fn for_instruction(chunk: &Chunk, offset: usize) -> usize {
         local,
         (jump_target as usize | (jump_target2 as usize) << 8) as i16
     );
-    return offset + 4;
+    offset + 4
 }

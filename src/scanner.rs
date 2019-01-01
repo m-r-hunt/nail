@@ -258,7 +258,7 @@ impl Scanner {
         if self.is_at_end() {
             return '\0';
         }
-        return self.source[self.current + 1];
+        self.source[self.current + 1]
     }
 
     fn advance(&mut self) -> char {
@@ -274,7 +274,7 @@ impl Scanner {
             return false;
         }
         self.current += 1;
-        return true;
+        true
     }
 
     fn skip_whitespace(&mut self) {
@@ -304,7 +304,7 @@ impl Scanner {
 
     fn make_token(&self, token_type: TokenType) -> Token {
         Token {
-            token_type: token_type,
+            token_type,
             start: self.start,
             length: self.current - self.start,
             line: self.line,
@@ -324,7 +324,7 @@ impl Scanner {
         }
         self.advance();
 
-        return Ok(self.make_token(TokenType::String));
+        Ok(self.make_token(TokenType::String))
     }
 
     fn char(&mut self) -> Result<Token> {
@@ -332,11 +332,11 @@ impl Scanner {
             self.advance();
         }
         self.advance();
-        if !(self.peek() == '\'') {
+        if self.peek() != '\'' {
             return Err(ScannerError("Unterminated char literal.".to_string()));
         }
         self.advance();
-        return Ok(self.make_token(TokenType::CharLiteral));
+        Ok(self.make_token(TokenType::CharLiteral))
     }
 
     fn number(&mut self) -> Result<Token> {
@@ -351,14 +351,14 @@ impl Scanner {
             }
         }
 
-        return Ok(self.make_token(TokenType::Number));
+        Ok(self.make_token(TokenType::Number))
     }
 
     fn identifier(&mut self) -> Result<Token> {
         while is_alpha(self.peek()) || is_digit(self.peek()) {
             self.advance();
         }
-        return Ok(self.make_token(self.identifier_type()));
+        Ok(self.make_token(self.identifier_type()))
     }
 
     fn identifier_type(&self) -> TokenType {

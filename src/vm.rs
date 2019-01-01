@@ -33,18 +33,18 @@ impl ValueStack {
     fn pop(&mut self, line: usize) -> Result<Value, InterpreterError> {
         if self.top >= 1 {
             self.top -= 1;
-            return Ok(self.stack[self.top].clone());
+            Ok(self.stack[self.top].clone())
         } else {
-            return runtime_error("Not enough values on the stack", line);
+            runtime_error("Not enough values on the stack", line)
         }
     }
 
     fn pop_multi(&mut self, n: usize, line: usize) -> Result<Value, InterpreterError> {
         if self.top >= n {
             self.top -= n;
-            return Ok(Value::Nil);
+            Ok(Value::Nil)
         } else {
-            return runtime_error("Not enough values on the stack", line);
+            runtime_error("Not enough values on the stack", line)
         }
     }
 
@@ -115,6 +115,12 @@ macro_rules! binary_op {
             }
             $self.stack.push(Value::$ret(a $op b))
         }
+    }
+}
+
+impl Default for VM {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -322,7 +328,7 @@ impl VM {
                             }
                             // Todo: Make this better and maybe utf8 safe.
                             let c = s.into_bytes()[v];
-                            self.stack.push(Value::Number(c as f64));
+                            self.stack.push(Value::Number(f64::from(c)));
                         }
 
                         Value::ReferenceId(id) => {
@@ -598,7 +604,7 @@ impl VM {
                         }
                         Value::ReferenceId(id) => match &mut self.heap[id] {
                             ReferenceType::Array(a) => {
-                                if a.len() > 0 {
+                                if !a.is_empty() {
                                     self.locals[local_n as usize + self.locals_base] =
                                         Value::Number(0.0);
                                     self.stack.push(Value::Range(1.0, a.len() as f64));
@@ -607,7 +613,7 @@ impl VM {
                                 }
                             }
                             ReferenceType::Map(m) => {
-                                let keys: Vec<_> = m.keys().map(|e| e.clone()).collect();
+                                let keys: Vec<_> = m.keys().cloned().collect();
                                 let len = keys.len();
                                 if len > 0 {
                                     self.locals[local_n as usize + self.locals_base] =
@@ -745,6 +751,6 @@ impl VM {
 
     fn new_reference_type(&mut self, value: ReferenceType) -> usize {
         self.heap.push(value);
-        return self.heap.len() - 1;
+        self.heap.len() - 1
     }
 }

@@ -40,7 +40,7 @@ pub fn repl() {
 pub fn run_file(filename: &str) {
     let start = Instant::now();
     let result = std::fs::read_to_string(filename);
-    let code = result.expect(&format!("Unable to read file {}", filename));
+    let code = result.unwrap_or_else(|_| panic!("Unable to read file {}", filename));
     let read_file_done = Instant::now();
 
     let mut vm = vm::VM::new();

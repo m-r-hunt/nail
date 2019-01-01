@@ -162,34 +162,31 @@ impl Chunk {
 
     pub fn add_constant(&mut self, value: Value) -> u8 {
         self.constants.push(value);
-        return (self.constants.len() - 1) as u8;
+        (self.constants.len() - 1) as u8
     }
 
     pub fn register_function(&mut self, name: String, _arity: u8) {
         use std::collections::hash_map::Entry;
-        match self.function_names.entry(name) {
-            Entry::Vacant(v) => {
-                v.insert(self.function_locations.len() as u8);
-                self.function_locations.push(0);
-            }
-            _ => {}
-        };
+        if let Entry::Vacant(v) = self.function_names.entry(name) {
+            v.insert(self.function_locations.len() as u8);
+            self.function_locations.push(0);
+        }
     }
 
-    pub fn start_function(&mut self, name: String, line: usize) -> usize {
+    pub fn start_function(&mut self, name: &str, line: usize) -> usize {
         let address = self.code.len();
         self.code.push(OpCode::FunctionEntry as u8);
         self.lines.push(line);
         let ret = self.code.len();
         self.code.push(0);
         self.lines.push(line);
-        self.function_locations[*self.function_names.get(&name).unwrap() as usize] = address;
-        return ret;
+        self.function_locations[self.function_names[name] as usize] = address;
+        ret
     }
 
     pub fn lookup_function(&self, name: &str) -> usize {
-        let number = self.function_names.get(name).unwrap();
-        return self.function_locations[*number as usize];
+        let number = self.function_names[name];
+        self.function_locations[number as usize]
     }
 
     pub fn register_global(&mut self, name: &str, value: Value) {

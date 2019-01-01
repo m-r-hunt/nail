@@ -1,3 +1,7 @@
+#![allow(clippy::needless_pass_by_value)]
+// This seems to be a bug in clippy as I'm using values inside a struct.
+// Actually this lint is being allowed by default in future, so this can probably be ignored.
+
 use super::{
     chunk, chunk::OpCode, debug, errors::NotloxError::CompilerError, errors::Result, parser,
     scanner, scanner::TokenType, value,
@@ -98,7 +102,7 @@ impl Compiler {
                 return Some(*n);
             }
         }
-        return None;
+        None
     }
 
     fn compile_program(&mut self, program: parser::Program) -> Result<()> {
@@ -110,7 +114,7 @@ impl Compiler {
             self.compile_fn_statement(fn_statement, true)?;
         }
 
-        return Ok(());
+        Ok(())
     }
 
     fn compile_statement(&mut self, statement: parser::Statement, top_level: bool) -> Result<()> {
@@ -148,11 +152,9 @@ impl Compiler {
                 Ok(value::Value::Boolean(true))
             }
             parser::Expression::Literal(parser::Literal::Nil(_)) => Ok(value::Value::Nil),
-            _ => {
-                return Err(CompilerError(
-                    "Expected literal in global let initializer.".to_string(),
-                ))
-            }
+            _ => Err(CompilerError(
+                "Expected literal in global let initializer.".to_string(),
+            )),
         }
     }
 
@@ -187,7 +189,7 @@ impl Compiler {
             }
         }
 
-        return Ok(());
+        Ok(())
     }
 
     fn compile_print_statement(&mut self, statement: parser::PrintStatement) -> Result<()> {
@@ -195,7 +197,7 @@ impl Compiler {
         self.chunk.write_chunk(OpCode::Print as u8, statement.line);
         self.adjust_stack_usage(-1);
 
-        return Ok(());
+        Ok(())
     }
 
     fn compile_expression_statement(
@@ -206,7 +208,7 @@ impl Compiler {
         self.chunk.write_chunk(OpCode::Pop as u8, statement.line);
         self.adjust_stack_usage(-1);
 
-        return Ok(());
+        Ok(())
     }
 
     fn compile_fn_statement(
@@ -219,13 +221,13 @@ impl Compiler {
         if !top_level {
             self.deferred.push(fn_statement);
 
-            return Ok(());
+            Ok(())
         } else {
             self.max_local = 0;
             self.pushed_this_fn = 0;
             let locals_addr = self
                 .chunk
-                .start_function(fn_statement.name, fn_statement.line);
+                .start_function(&fn_statement.name, fn_statement.line);
             for arg in fn_statement.args.into_iter().rev() {
                 let local_number = self.bind_local(arg);
                 self.chunk
@@ -237,7 +239,7 @@ impl Compiler {
                 .write_chunk(OpCode::Return as u8, fn_statement.line);
             self.chunk.code[locals_addr] = self.max_local;
 
-            return Ok(());
+            Ok(())
         }
     }
 
@@ -303,7 +305,7 @@ impl Compiler {
             }
         }
 
-        return Ok(());
+        Ok(())
     }
 
     fn compile_unary(&mut self, unary: parser::Unary) -> Result<()> {
@@ -314,7 +316,7 @@ impl Compiler {
             _ => panic!("Unimplemented unary operator"),
         }
 
-        return Ok(());
+        Ok(())
     }
 
     fn compile_binary(&mut self, binary: parser::Binary) -> Result<()> {
@@ -352,7 +354,7 @@ impl Compiler {
             self.adjust_stack_usage(-1);
         }
 
-        return Ok(());
+        Ok(())
     }
 
     fn compile_and(&mut self, binary: parser::Binary) -> Result<()> {
@@ -371,7 +373,7 @@ impl Compiler {
         let jump_target = self.chunk.code.len();
         self.insert_jump_address(jump_address, jump_target);
 
-        return Ok(());
+        Ok(())
     }
 
     fn compile_or(&mut self, binary: parser::Binary) -> Result<()> {
@@ -390,7 +392,7 @@ impl Compiler {
         let jump_target = self.chunk.code.len();
         self.insert_jump_address(jump_address, jump_target);
 
-        return Ok(());
+        Ok(())
     }
 
     fn compile_grouping(&mut self, grouping: parser::Grouping) -> Result<()> {
@@ -436,7 +438,7 @@ impl Compiler {
         }
         self.pop_environment();
 
-        return Ok(());
+        Ok(())
     }
 
     fn compile_call(&mut self, call: parser::Call) -> Result<()> {
@@ -457,7 +459,7 @@ impl Compiler {
         self.adjust_stack_usage(-(nargs as i8));
         self.adjust_stack_usage(1);
 
-        return Ok(());
+        Ok(())
     }
 
     fn insert_jump_address(&mut self, jump_target_address: usize, dest_address: usize) {
@@ -494,7 +496,7 @@ impl Compiler {
         let addr = self.chunk.code.len();
         self.insert_jump_address(else_target_address, addr);
 
-        return Ok(());
+        Ok(())
     }
 
     fn compile_while(&mut self, while_expression: parser::While) -> Result<()> {
@@ -523,7 +525,7 @@ impl Compiler {
             .write_chunk(OpCode::PushNil as u8, while_expression.line);
         self.adjust_stack_usage(1);
 
-        return Ok(());
+        Ok(())
     }
 
     fn compile_for(&mut self, for_expression: parser::For) -> Result<()> {
@@ -576,7 +578,7 @@ impl Compiler {
             .write_chunk(OpCode::PushNil as u8, for_expression.line);
         self.pop_loop_context(current_address);
 
-        return Ok(());
+        Ok(())
     }
 
     fn compile_loop(&mut self, loop_expression: parser::Loop) -> Result<()> {
@@ -597,7 +599,7 @@ impl Compiler {
             .write_chunk(OpCode::PushNil as u8, loop_expression.line);
         self.adjust_stack_usage(1);
 
-        return Ok(());
+        Ok(())
     }
 
     fn compile_assignment(&mut self, assignment: parser::Assignment) -> Result<()> {
@@ -636,7 +638,7 @@ impl Compiler {
             .write_chunk(OpCode::PushNil as u8, assignment.line);
         self.adjust_stack_usage(1);
 
-        return Ok(());
+        Ok(())
     }
 
     fn compile_compound_assignment(
@@ -670,7 +672,7 @@ impl Compiler {
             line: compound_assignment.line,
         })?;
 
-        return Ok(());
+        Ok(())
     }
 
     fn compile_index(&mut self, index: parser::Index) -> Result<()> {
@@ -679,7 +681,7 @@ impl Compiler {
         self.chunk.write_chunk(OpCode::Index as u8, index.line);
         self.adjust_stack_usage(-1);
 
-        return Ok(());
+        Ok(())
     }
 
     fn compile_array(&mut self, array: parser::Array) -> Result<()> {
@@ -691,7 +693,7 @@ impl Compiler {
             self.adjust_stack_usage(-1);
         }
 
-        return Ok(());
+        Ok(())
     }
 
     fn compile_map(&mut self, map: parser::Map) -> Result<()> {
@@ -716,7 +718,7 @@ impl Compiler {
             self.adjust_stack_usage(-2);
         }
 
-        return Ok(());
+        Ok(())
     }
 
     fn compile_builtin_call(&mut self, builtin_call: parser::BuiltinCall) -> Result<()> {
@@ -737,7 +739,7 @@ impl Compiler {
         self.adjust_stack_usage(-2 - (nargs as i8));
         self.adjust_stack_usage(1);
 
-        return Ok(());
+        Ok(())
     }
 
     fn compile_range(&mut self, range: parser::Range) -> Result<()> {
@@ -746,7 +748,7 @@ impl Compiler {
         self.chunk.write_chunk(OpCode::MakeRange as u8, range.line);
         self.adjust_stack_usage(-1);
 
-        return Ok(());
+        Ok(())
     }
 
     fn compile_return(&mut self, return_expression: parser::Return) -> Result<()> {
@@ -768,7 +770,7 @@ impl Compiler {
             .write_chunk(OpCode::Return as u8, return_expression.line);
         self.adjust_stack_usage(1); // Logically this should be an expression returning a value, but it doesn't return.
 
-        return Ok(());
+        Ok(())
     }
 
     fn compile_continue(&mut self, line: usize) -> Result<()> {
