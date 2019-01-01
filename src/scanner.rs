@@ -56,6 +56,7 @@ pub enum TokenType {
     CharLiteral,
 
     Break,
+    Const,
     Continue,
     Else,
     False,
@@ -88,6 +89,7 @@ impl Scanner {
     pub fn new(source: &str) -> Scanner {
         let mut kw_map = std::collections::HashMap::new();
         kw_map.insert("break".to_string(), TokenType::Break);
+        kw_map.insert("const".to_string(), TokenType::Const);
         kw_map.insert("continue".to_string(), TokenType::Continue);
         kw_map.insert("else".to_string(), TokenType::Else);
         kw_map.insert("false".to_string(), TokenType::False);

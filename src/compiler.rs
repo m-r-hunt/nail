@@ -18,6 +18,7 @@ pub fn compile(source: &str) -> Result<chunk::Chunk> {
 
 struct Environment {
     locals: HashMap<String, u8>,
+    consts: HashMap<String, u8>,
     next_local: u8,
 }
 
@@ -25,6 +26,7 @@ impl Environment {
     fn new(next_local: u8) -> Self {
         Self {
             locals: HashMap::new(),
+            consts: HashMap::new(),
             next_local,
         }
     }
@@ -105,6 +107,15 @@ impl Compiler {
         None
     }
 
+    fn find_const(&self, name: &str) -> Option<u8> {
+        for e in self.environments.iter().rev() {
+            if let Some(n) = e.consts.get(name) {
+                return Some(*n);
+            }
+        }
+        None
+    }
+
     fn compile_program(&mut self, program: parser::Program) -> Result<()> {
         for d in program.statements {
             self.compile_statement(d, true)?;
@@ -120,6 +131,7 @@ impl Compiler {
     fn compile_statement(&mut self, statement: parser::Statement, top_level: bool) -> Result<()> {
         match statement {
             parser::Statement::LetStatement(v) => self.compile_let_statement(v, top_level),
+            parser::Statement::ConstStatement(c) => self.compile_const_statement(c),
             parser::Statement::PrintStatement(p) => self.compile_print_statement(p),
             parser::Statement::ExpressionStatement(e) => self.compile_expression_statement(e),
             parser::Statement::FnStatement(f) => self.compile_fn_statement(f, top_level),
@@ -132,6 +144,12 @@ impl Compiler {
         current_env.next_local += 1;
         self.max_local += 1;
         current_env.next_local - 1
+    }
+
+    fn bind_const(&mut self, name: String, value: value::Value) {
+        let c = self.chunk.add_constant(value);
+        let current_env = self.environments.last_mut().unwrap();
+        current_env.consts.insert(name, c);
     }
 
     fn evaluate(&mut self, expression: parser::Expression) -> Result<value::Value> {
@@ -189,6 +207,12 @@ impl Compiler {
             }
         }
 
+        Ok(())
+    }
+
+    fn compile_const_statement(&mut self, const_statement: parser::ConstStatement) -> Result<()> {
+        let value = self.evaluate(const_statement.initializer)?;
+        self.bind_const(const_statement.name, value);
         Ok(())
     }
 
@@ -405,8 +429,11 @@ impl Compiler {
                 .write_chunk(OpCode::LoadLocal as u8, variable.line);
             self.chunk.write_chunk(number, variable.line);
             self.adjust_stack_usage(1);
-
-            return Ok(());
+        } else if let Some(number) = self.find_const(&variable.name) {
+            self.chunk
+                .write_chunk(OpCode::Constant as u8, variable.line);
+            self.chunk.write_chunk(number, variable.line);
+            self.adjust_stack_usage(1);
         } else if self.chunk.check_global(&variable.name) {
             let c = self.chunk.add_constant(value::Value::String(variable.name));
             self.chunk
@@ -414,14 +441,13 @@ impl Compiler {
             self.chunk.write_chunk(c, variable.line);
             self.chunk
                 .write_chunk(OpCode::LoadGlobal as u8, variable.line);
-
-            return Ok(());
         } else {
             return Err(CompilerError(format!(
                 "Undefined variable: {}",
                 variable.name
             )));
         }
+        Ok(())
     }
 
     fn compile_block(&mut self, block: parser::Block) -> Result<()> {

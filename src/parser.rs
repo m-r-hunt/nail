@@ -208,6 +208,13 @@ pub struct LetStatement {
 }
 
 #[derive(Debug, Clone)]
+pub struct ConstStatement {
+    pub name: String,
+    pub initializer: Expression,
+    pub line: usize,
+}
+
+#[derive(Debug, Clone)]
 pub struct FnStatement {
     pub name: String,
     pub args: Vec<String>,
@@ -219,6 +226,7 @@ pub struct FnStatement {
 pub enum Statement {
     ExpressionStatement(ExpressionStatement),
     LetStatement(LetStatement),
+    ConstStatement(ConstStatement),
     PrintStatement(PrintStatement),
     FnStatement(FnStatement),
 }
@@ -246,6 +254,9 @@ impl Parser {
         if self.matches(&[TokenType::Let])? {
             return self.let_statement();
         }
+        if self.matches(&[TokenType::Const])? {
+            return self.const_statement();
+        }
         if self.matches(&[TokenType::Fn])? {
             return self.fn_statement();
         }
@@ -269,6 +280,22 @@ impl Parser {
         )?;
         let name = self.scanner.get_lexeme(&name);
         Ok(Statement::LetStatement(LetStatement {
+            name,
+            initializer,
+            line,
+        }))
+    }
+
+    fn const_statement(&mut self) -> Result<Statement> {
+        let line = self.previous().line;
+        let name = self.consume(TokenType::Identifier, "Expect variable name.")?;
+
+        self.consume(TokenType::Equal, "Expected = after const name.")?;
+        let initializer = self.expression()?;
+
+        self.consume(TokenType::Semicolon, "Expect ';' after const declaration.")?;
+        let name = self.scanner.get_lexeme(&name);
+        Ok(Statement::ConstStatement(ConstStatement {
             name,
             initializer,
             line,
@@ -350,6 +377,10 @@ impl Parser {
                 TokenType::Let => {
                     self.consume(TokenType::Let, "This should never happen.")?;
                     statements.push(self.let_statement()?);
+                }
+                TokenType::Const => {
+                    self.consume(TokenType::Const, "This should never happen.")?;
+                    statements.push(self.const_statement()?);
                 }
                 TokenType::Print => {
                     self.consume(TokenType::Print, "This should never happen.")?;
