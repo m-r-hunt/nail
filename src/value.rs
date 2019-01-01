@@ -92,7 +92,9 @@ impl Ord for HashableValue {
             },
             HashableValue::String(s) => match other {
                 HashableValue::String(s2) => s.cmp(s2),
-                HashableValue::ReferenceId(_) | HashableValue::Range(..) | HashableValue::Callable(..) => Ordering::Less,
+                HashableValue::ReferenceId(_)
+                | HashableValue::Range(..)
+                | HashableValue::Callable(..) => Ordering::Less,
                 _ => Ordering::Greater,
             },
             HashableValue::ReferenceId(id) => match other {
@@ -108,7 +110,7 @@ impl Ord for HashableValue {
             HashableValue::Callable(c) => match other {
                 HashableValue::Callable(c2) => c.cmp(c2),
                 _ => Ordering::Greater,
-            }
+            },
         }
     }
 }

@@ -358,20 +358,27 @@ impl VM {
         Ok(())
     }
 
-    fn op_function_entry(&mut self, _current_line: usize) -> Result<(), InterpreterError> {
+    fn op_function_entry(&mut self, current_line: usize) -> Result<(), InterpreterError> {
         let localsn = self.read_byte() as usize;
         self.locals_top = self.locals_base + localsn;
+        if self.locals_top >= STACK_SIZE {
+            return runtime_error("Stack overflow!", current_line);
+        }
         Ok(())
     }
 
-    fn op_call(&mut self, _current_line: usize) -> Result<(), InterpreterError> {
-        let fn_number = self.read_byte();
+    fn op_call(&mut self, current_line: usize) -> Result<(), InterpreterError> {
+        let callee = match self.stack.pop(current_line)? {
+            Value::Callable(c) => c,
+            _ => return runtime_error("Non-callable value called", current_line),
+        };
+
         self.return_stack[self.return_stack_top] = CallFrame {
             return_address: self.ip,
             locals_base: self.locals_base,
         };
         self.return_stack_top += 1;
-        self.ip = self.chunk.function_locations[fn_number as usize];
+        self.ip = callee;
         self.locals_base = self.locals_top;
         Ok(())
     }

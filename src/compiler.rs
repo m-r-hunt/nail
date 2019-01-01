@@ -259,7 +259,10 @@ impl Compiler {
 
             Ok(())
         } else {
-            self.bind_const(fn_statement.name.clone(), value::Value::Callable(self.chunk.code.len()));
+            self.bind_const(
+                fn_statement.name.clone(),
+                value::Value::Callable(self.chunk.code.len()),
+            );
             self.chunk
                 .register_function(fn_statement.name.clone(), fn_statement.args.len() as u8);
             self.max_local = 0;
@@ -492,16 +495,8 @@ impl Compiler {
         for e in call.args {
             self.compile_expression(e)?;
         }
+        self.compile_expression(*call.callee)?;
         self.chunk.write_chunk(OpCode::Call as u8, call.line);
-        if let parser::Expression::Variable(v) = *call.callee {
-            if let Some(fn_number) = self.chunk.function_names.get(&v.name) {
-                self.chunk.write_chunk(*fn_number, call.line);
-            } else {
-                return Err(CompilerError(format!("Undefined function: {}", v.name)));
-            }
-        } else {
-            return Err(CompilerError("Expected variable in call".to_string()));
-        }
         self.adjust_stack_usage(-(nargs as i8));
         self.adjust_stack_usage(1);
 

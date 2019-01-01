@@ -39,7 +39,7 @@ pub fn disassemble_instruction(chunk: &Chunk, offset: usize) -> usize {
         Some(OpCode::Pop) => simple_instruction("OP_POP", offset),
 
         Some(OpCode::FunctionEntry) => number_instruction("OP_FN_ENTRY", &chunk, offset),
-        Some(OpCode::Call) => number_instruction("OP_CALL", &chunk, offset),
+        Some(OpCode::Call) => simple_instruction("OP_CALL", offset),
 
         Some(OpCode::JumpIfFalse) => {
             signed_number_16_instruction("OP_JUMP_IF_FALSE", &chunk, offset)
