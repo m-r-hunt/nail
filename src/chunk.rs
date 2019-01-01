@@ -193,7 +193,7 @@ impl Chunk {
         self.globals.insert(name.to_string(), value);
     }
 
-    pub fn check_global(&mut self, name: &str) -> bool {
+    pub fn check_global(&self, name: &str) -> bool {
         self.globals.get(name).is_some()
     }
 

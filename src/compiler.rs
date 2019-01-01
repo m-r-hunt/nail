@@ -16,6 +16,13 @@ pub fn compile(source: &str) -> Result<chunk::Chunk> {
     Ok(compiler.chunk)
 }
 
+enum ResolvedSymbol {
+    Local(u8),
+    Const(u8),
+    Global,
+    Undefined,
+}
+
 struct Environment {
     locals: HashMap<String, u8>,
     consts: HashMap<String, u8>,
@@ -98,22 +105,22 @@ impl Compiler {
             (self.loop_contexts.last().unwrap().pushed_this_loop as i8 + usage) as u8;
     }
 
-    fn find_local(&self, name: &str) -> Option<u8> {
+    fn find_symbol(&self, name: &str) -> ResolvedSymbol {
         for e in self.environments.iter().rev() {
+            // Todo: Ensure ordering works properly.
+            // Currently locals will always be found before consts.
+            // May need a stack of both local and const definitions in an env.
             if let Some(n) = e.locals.get(name) {
-                return Some(*n);
+                return ResolvedSymbol::Local(*n);
+            } else if let Some(n) = e.consts.get(name) {
+                return ResolvedSymbol::Const(*n);
             }
         }
-        None
-    }
-
-    fn find_const(&self, name: &str) -> Option<u8> {
-        for e in self.environments.iter().rev() {
-            if let Some(n) = e.consts.get(name) {
-                return Some(*n);
-            }
+        if self.chunk.check_global(name) {
+            ResolvedSymbol::Global
+        } else {
+            ResolvedSymbol::Undefined
         }
-        None
     }
 
     fn compile_program(&mut self, program: parser::Program) -> Result<()> {
@@ -424,28 +431,33 @@ impl Compiler {
     }
 
     fn compile_variable(&mut self, variable: parser::Variable) -> Result<()> {
-        if let Some(number) = self.find_local(&variable.name) {
-            self.chunk
-                .write_chunk(OpCode::LoadLocal as u8, variable.line);
-            self.chunk.write_chunk(number, variable.line);
-            self.adjust_stack_usage(1);
-        } else if let Some(number) = self.find_const(&variable.name) {
-            self.chunk
-                .write_chunk(OpCode::Constant as u8, variable.line);
-            self.chunk.write_chunk(number, variable.line);
-            self.adjust_stack_usage(1);
-        } else if self.chunk.check_global(&variable.name) {
-            let c = self.chunk.add_constant(value::Value::String(variable.name));
-            self.chunk
-                .write_chunk(OpCode::Constant as u8, variable.line);
-            self.chunk.write_chunk(c, variable.line);
-            self.chunk
-                .write_chunk(OpCode::LoadGlobal as u8, variable.line);
-        } else {
-            return Err(CompilerError(format!(
-                "Undefined variable: {}",
-                variable.name
-            )));
+        match self.find_symbol(&variable.name) {
+            ResolvedSymbol::Local(number) => {
+                self.chunk
+                    .write_chunk(OpCode::LoadLocal as u8, variable.line);
+                self.chunk.write_chunk(number, variable.line);
+                self.adjust_stack_usage(1);
+            }
+            ResolvedSymbol::Const(number) => {
+                self.chunk
+                    .write_chunk(OpCode::Constant as u8, variable.line);
+                self.chunk.write_chunk(number, variable.line);
+                self.adjust_stack_usage(1);
+            }
+            ResolvedSymbol::Global => {
+                let c = self.chunk.add_constant(value::Value::String(variable.name));
+                self.chunk
+                    .write_chunk(OpCode::Constant as u8, variable.line);
+                self.chunk.write_chunk(c, variable.line);
+                self.chunk
+                    .write_chunk(OpCode::LoadGlobal as u8, variable.line);
+            }
+            ResolvedSymbol::Undefined => {
+                return Err(CompilerError(format!(
+                    "Undefined variable: {}",
+                    variable.name
+                )));
+            }
         }
         Ok(())
     }
@@ -632,23 +644,33 @@ impl Compiler {
         match assignment.lvalue {
             parser::LValue::Variable(v) => {
                 self.compile_expression(*assignment.value)?;
-                if let Some(local_number) = self.find_local(&v.name) {
-                    self.chunk
-                        .write_chunk(OpCode::AssignLocal as u8, assignment.line);
-                    self.chunk.write_chunk(local_number, assignment.line);
-                    self.adjust_stack_usage(-1);
-                } else if self.chunk.check_global(&v.name) {
-                    let c = self.chunk.add_constant(value::Value::String(v.name));
-                    self.chunk
-                        .write_chunk(OpCode::Constant as u8, assignment.line);
-                    self.chunk.write_chunk(c, assignment.line);
-                    self.chunk
-                        .write_chunk(OpCode::AssignGlobal as u8, assignment.line);
-                } else {
-                    return Err(CompilerError(format!(
-                        "Assignment to undefined local: {}",
-                        v.name
-                    )));
+                match self.find_symbol(&v.name) {
+                    ResolvedSymbol::Local(local_number) => {
+                        self.chunk
+                            .write_chunk(OpCode::AssignLocal as u8, assignment.line);
+                        self.chunk.write_chunk(local_number, assignment.line);
+                        self.adjust_stack_usage(-1);
+                    }
+                    ResolvedSymbol::Const(_) => {
+                        return Err(CompilerError(format!(
+                            "Attempt to assign to const: {}",
+                            v.name
+                        )));
+                    }
+                    ResolvedSymbol::Global => {
+                        let c = self.chunk.add_constant(value::Value::String(v.name));
+                        self.chunk
+                            .write_chunk(OpCode::Constant as u8, assignment.line);
+                        self.chunk.write_chunk(c, assignment.line);
+                        self.chunk
+                            .write_chunk(OpCode::AssignGlobal as u8, assignment.line);
+                    }
+                    ResolvedSymbol::Undefined => {
+                        return Err(CompilerError(format!(
+                            "Assignment to undefined local: {}",
+                            v.name
+                        )));
+                    }
                 }
             }
             parser::LValue::Index(i) => {
