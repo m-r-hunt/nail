@@ -61,7 +61,7 @@ struct Compiler {
     chunk: chunk::Chunk,
     environments: Vec<Environment>,
     loop_contexts: Vec<LoopContext>,
-    deferred: Vec<parser::FnStatement>,
+    deferred: Vec<(parser::FnStatement, u8)>,
     max_local: u8,
     pushed_this_fn: u8,
 }
@@ -128,8 +128,11 @@ impl Compiler {
             self.compile_statement(d, true)?;
         }
 
-        while let Some(fn_statement) = self.deferred.pop() {
+        while let Some((fn_statement, constant)) = self.deferred.pop() {
+            let name = fn_statement.name.clone();
             self.compile_fn_statement(fn_statement, true)?;
+            let addr = self.chunk.lookup_function(&name);
+            self.chunk.constants[constant as usize] = value::Value::Callable(addr);
         }
 
         Ok(())
@@ -153,10 +156,11 @@ impl Compiler {
         current_env.next_local - 1
     }
 
-    fn bind_const(&mut self, name: String, value: value::Value) {
+    fn bind_const(&mut self, name: String, value: value::Value) -> u8 {
         let c = self.chunk.add_constant(value);
         let current_env = self.environments.last_mut().unwrap();
         current_env.consts.insert(name, c);
+        c
     }
 
     fn evaluate(&mut self, expression: parser::Expression) -> Result<value::Value> {
@@ -247,13 +251,17 @@ impl Compiler {
         fn_statement: parser::FnStatement,
         top_level: bool,
     ) -> Result<()> {
-        self.chunk
-            .register_function(fn_statement.name.clone(), fn_statement.args.len() as u8);
         if !top_level {
-            self.deferred.push(fn_statement);
+            let c = self.bind_const(fn_statement.name.clone(), value::Value::Callable(0));
+            self.chunk
+                .register_function(fn_statement.name.clone(), fn_statement.args.len() as u8);
+            self.deferred.push((fn_statement, c));
 
             Ok(())
         } else {
+            self.bind_const(fn_statement.name.clone(), value::Value::Callable(self.chunk.code.len()));
+            self.chunk
+                .register_function(fn_statement.name.clone(), fn_statement.args.len() as u8);
             self.max_local = 0;
             self.pushed_this_fn = 0;
             let locals_addr = self

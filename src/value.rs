@@ -11,6 +11,7 @@ pub enum Value {
     ReferenceId(usize),
     Range(f64, f64),
     MapForContext(Vec<HashableValue>, f64, f64),
+    Callable(usize),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -54,6 +55,7 @@ pub enum HashableValue {
     String(String),
     ReferenceId(usize),
     Range(SanitizedFloat, SanitizedFloat),
+    Callable(usize),
 }
 
 // TL;DR Different enum cases always compare less/equal based on their order in the enum.
@@ -90,18 +92,23 @@ impl Ord for HashableValue {
             },
             HashableValue::String(s) => match other {
                 HashableValue::String(s2) => s.cmp(s2),
-                HashableValue::ReferenceId(_) | HashableValue::Range(..) => Ordering::Less,
+                HashableValue::ReferenceId(_) | HashableValue::Range(..) | HashableValue::Callable(..) => Ordering::Less,
                 _ => Ordering::Greater,
             },
             HashableValue::ReferenceId(id) => match other {
                 HashableValue::ReferenceId(id2) => id.cmp(id2),
-                HashableValue::Range(..) => Ordering::Less,
+                HashableValue::Range(..) | HashableValue::Callable(..) => Ordering::Less,
                 _ => Ordering::Greater,
             },
             HashableValue::Range(l, _) => match other {
                 HashableValue::Range(l2, _) => l.to_f64().partial_cmp(&l2.to_f64()).unwrap(),
+                HashableValue::Callable(..) => Ordering::Less,
                 _ => Ordering::Greater,
             },
+            HashableValue::Callable(c) => match other {
+                HashableValue::Callable(c2) => c.cmp(c2),
+                _ => Ordering::Greater,
+            }
         }
     }
 }
@@ -128,6 +135,7 @@ impl HashableValue {
                 "Tried to hash map for context, this should never happen.".to_string(),
                 line,
             )),
+            Value::Callable(c) => Ok(HashableValue::Callable(*c)),
         }
     }
 }
@@ -141,6 +149,7 @@ impl Value {
             HashableValue::String(s) => Value::String(s.clone()),
             HashableValue::ReferenceId(i) => Value::ReferenceId(*i),
             HashableValue::Range(l, r) => Value::Range(l.to_f64(), r.to_f64()),
+            HashableValue::Callable(c) => Value::Callable(*c),
         }
     }
 }
@@ -198,6 +207,7 @@ impl std::fmt::Display for Value {
             Value::ReferenceId(i) => write!(f, "RefId({})", i),
             Value::Range(l, r) => write!(f, "{}..{}", l, r),
             Value::MapForContext(..) => panic!("Attempted to display map for context."),
+            Value::Callable(c) => write!(f, "Callable({})", c),
         }
     }
 }
