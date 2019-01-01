@@ -498,7 +498,6 @@ impl Compiler {
         self.compile_expression(*call.callee)?;
         self.chunk.write_chunk(OpCode::Call as u8, call.line);
         self.adjust_stack_usage(-(nargs as i8));
-        self.adjust_stack_usage(1);
 
         Ok(())
     }
