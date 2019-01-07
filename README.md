@@ -8,4 +8,4 @@ The Nail compiler and virtual machine are implemented in Rust. It uses a handwri
 
 Nail is mostly feature complete, although it is notably lacking any kind of garbage collection.
 
-There's a decent body of example Nail code in [my Advent of Code 2018 solutions](https://github.com/m-r-hunt/aoc2018).
+There's a decent body of example Nail code in [my Advent of Code 2018 solutions](https://github.com/m-r-hunt/aoc2018). I also wrote a bit about my experience writing Nail [on my blog](http://mechtoast.com/blog/languages/adventures-in-programming-language-design/).
