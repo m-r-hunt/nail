@@ -1,5 +1,5 @@
 [package]
-name = "notlox"
+name = "nail"
 version = "0.1.0"
 authors = ["Max Hunt <max@huntw3.com>"]
 autobins = false
@@ -10,11 +10,11 @@ num = "0.2"
 regex = "1"
 
 [lib]
-name = "notlox"
+name = "nail"
 path = "src/lib.rs"
 
 [[bin]]
-name = "notloxc"
+name = "nailc"
 path = "src/main.rs"
 
 [features]
